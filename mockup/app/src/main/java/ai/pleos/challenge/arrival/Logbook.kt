@@ -15,6 +15,8 @@ data class Segment(
     val arriveAt: Long? = null,
     val arriveKm: Float? = null,
     val arriveAddress: String = "",
+    val arriveLat: Double? = null,
+    val arriveLng: Double? = null,
 ) {
     val isClosed: Boolean get() = arriveAt != null && arriveKm != null
 
@@ -22,6 +24,7 @@ data class Segment(
         .put("departAt", departAt).put("departKm", departKm.toDouble()).put("departAddress", departAddress)
         .put("arriveAt", arriveAt ?: JSONObject.NULL).put("arriveKm", arriveKm?.toDouble() ?: JSONObject.NULL)
         .put("arriveAddress", arriveAddress)
+        .put("arriveLat", arriveLat ?: JSONObject.NULL).put("arriveLng", arriveLng ?: JSONObject.NULL)
 
     companion object {
         fun fromJson(o: JSONObject) = Segment(
@@ -31,6 +34,8 @@ data class Segment(
             arriveAt = if (o.isNull("arriveAt")) null else o.getLong("arriveAt"),
             arriveKm = if (o.isNull("arriveKm")) null else o.getDouble("arriveKm").toFloat(),
             arriveAddress = o.optString("arriveAddress"),
+            arriveLat = if (o.isNull("arriveLat")) null else o.getDouble("arriveLat"),
+            arriveLng = if (o.isNull("arriveLng")) null else o.getDouble("arriveLng"),
         )
     }
 }
@@ -55,6 +60,8 @@ object Logbook {
             endKm = last.arriveKm!!,
             startAddress = first.departAddress,
             endAddress = last.arriveAddress,
+            endLat = last.arriveLat,
+            endLng = last.arriveLng,
         )
         return trip.takeIf { it.distanceKm >= MIN_TRIP_KM }
     }

@@ -8,14 +8,14 @@ import android.content.Context
  */
 object Consent {
     /** Bump when the collected items change so everyone is asked again. */
-    const val VERSION = 2
+    const val VERSION = 3
 
     data class Item(val title: String, val detail: String)
 
     val items = listOf(
         Item("음성 (마이크)", "음성 명령과 주차 위치를 알아듣는 데 써요. 차 안에서 글자로 바꾸며, 녹음은 저장하지 않아요."),
         Item("차량 정보", "기어 상태와 계기판 누적 거리로 운행 시작·끝과 주행 거리를 기록해요."),
-        Item("위치", "내비게이션의 현재 주소로 출발지와 도착지를 기록해요."),
+        Item("위치", "내비게이션의 현재 주소로 출발지와 도착지를, GPS 좌표로 주차한 곳을 기록해요. 좌표는 문자 속 지도 링크를 만드는 데만 쓰며, 휴대폰에서 링크를 열 때 그 지도 서비스로 전달돼요."),
         Item("휴대폰 번호 (입력한 경우)", "문자 QR의 받는 사람으로만 써요."),
     )
 

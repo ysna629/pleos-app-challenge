@@ -107,6 +107,7 @@ class MainActivity : ComponentActivity() {
     private var showManual by mutableStateOf(false)
     private var notice by mutableStateOf("")
     private var phone by mutableStateOf("")
+    private var mapApp by mutableStateOf(MapApp.GOOGLE)
     private var consented by mutableStateOf(false)
     private var declined by mutableStateOf(false)
     private var confirmWithdraw by mutableStateOf(false)
@@ -124,6 +125,7 @@ class MainActivity : ComponentActivity() {
         trips.addAll(store.load())
         segments.addAll(segmentStore.load())
         phone = store.phone
+        mapApp = store.mapApp
         consentStore = ConsentStore(this)
         consented = consentStore.granted
         if (consented) startCollecting()
@@ -135,9 +137,9 @@ class MainActivity : ComponentActivity() {
     private fun startCollecting() {
         if (running) return
         running = true
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1)
-        }
+        val missing = listOf(Manifest.permission.RECORD_AUDIO, FUSED_LOCATION)
+            .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), 1)
 
         car = CarSignals(
             applicationContext,
@@ -195,6 +197,12 @@ class MainActivity : ComponentActivity() {
         consented = false
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        val located = permissions.indexOf(FUSED_LOCATION).let { it >= 0 && grantResults[it] == PackageManager.PERMISSION_GRANTED }
+        if (located && running) car.startLocation()
+    }
+
     override fun onDestroy() {
         stopCollecting()
         super.onDestroy()
@@ -213,7 +221,10 @@ class MainActivity : ComponentActivity() {
             val index = segments.lastIndex
             car.requestAddress { address -> runOnUiThread { updateSegment(index) { it.copy(departAddress = address) } } }
         } else if (isParked && wasParked != true && open >= 0) {
-            updateSegment(open) { it.copy(arriveAt = System.currentTimeMillis(), arriveKm = odometer ?: it.departKm) }
+            val fix = car.lastFix
+            updateSegment(open) {
+                it.copy(arriveAt = System.currentTimeMillis(), arriveKm = odometer ?: it.departKm, arriveLat = fix?.latitude, arriveLng = fix?.longitude)
+            }
             car.requestAddress { address -> runOnUiThread { updateSegment(open) { it.copy(arriveAddress = address) } } }
             showBanner = step == Step.IDLE
         }
@@ -468,7 +479,7 @@ class MainActivity : ComponentActivity() {
             trips[index] = trips[index].copy(parking = spot)
             store.save(trips)
         }
-        if (phone.isNotBlank() && index >= 0) Log.i(TAG, "qr ${trips[index].smsQrText(phone)}")
+        if (phone.isNotBlank() && index >= 0) Log.i(TAG, "qr ${trips[index].smsQrText(phone, mapApp)}")
         finishLogbook("${spot}로 저장했어요.")
     }
 
@@ -868,17 +879,30 @@ class MainActivity : ComponentActivity() {
                 phone.count(Char::isDigit) < 10 -> Body("내 번호를 입력하면 QR로 문자를 보낼 수 있어요.")
                 else -> {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Image(qrBitmap(trip.smsQrText(phone)).asImageBitmap(), contentDescription = "문자 보내기 QR 코드", modifier = Modifier.size(240.dp))
+                        Image(qrBitmap(trip.smsQrText(phone, mapApp)).asImageBitmap(), contentDescription = "문자 보내기 QR 코드", modifier = Modifier.size(240.dp))
                     }
                     Spacer(Modifier.height(12.dp))
                     Body("휴대폰 카메라로 스캔하면 문자 앱이 열려요. 보내면 내 문자함에 저장돼요.")
+                }
+            }
+            if (trip?.mapLink() != null) {
+                Spacer(Modifier.height(12.dp))
+                Label("지도 링크")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MapApp.entries.forEach { app ->
+                        FilterChip(
+                            selected = mapApp == app,
+                            onClick = { mapApp = app; store.mapApp = app },
+                            label = { Text(app.label, fontSize = 18.sp) },
+                        )
+                    }
                 }
             }
             if (trip != null) {
                 Spacer(Modifier.height(12.dp))
                 Label("보낼 문자")
                 Text(
-                    trip.smsBody(),
+                    trip.smsBody(mapApp),
                     fontSize = 17.sp,
                     color = Color.White,
                     modifier = Modifier.fillMaxWidth().background(Line, RoundedCornerShape(8.dp)).padding(12.dp),
@@ -912,6 +936,7 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val TAG = "ArrivalNote"
+        const val FUSED_LOCATION = "pleos.car.permission.FUSED_LOCATION"
         const val LISTEN_TIMEOUT_MS = 10_000L
         val FLOORS = listOf(-6, -5, -4, -3, -2, -1, 1, 2, 3)
         val LETTERS = ('A'..'Z').toList()
