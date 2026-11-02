@@ -96,7 +96,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - Win/Linux 팀원은 `crp-sys-img.xml` 사용
 - AVD `Pleos_Connect_v2.1.0`: RAM 4GB, cold boot 강제 (quick boot이면 VHAL 사용 불가)
 - **JDK 17 필수**: `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home`. Android Studio 내장 JBR은 Java 25라 Gradle 8.10 빌드 실패
-- `~/.zshrc`에 ANDROID_HOME/PATH 미설정 (사용자가 직접 추가 예정) → 명령은 전체 경로로 실행
+- `~/.zshrc`에 설정돼 있지만 Bash 도구 환경엔 안 잡힐 수 있음 → `JAVA_HOME`·`ANDROID_HOME=~/Library/Android/sdk`를 명시(`mockup/local.properties` 없음)
 
 ### 자주 쓰는 명령
 ```sh
@@ -119,6 +119,7 @@ $SDK/platform-tools/adb shell pm grant --user 10 <pkg> android.car.permission.CA
   - 기둥 코드: 여러 글자·앞자리 0·하이픈 지원(`에이엘 공이`→AL02, `비 십오`→B15, `씨 다시 삼`→C-3). UI는 A~Z·0~9·`-`·⌫·전체 지우기를 눌러 이어 붙이는 방식 + "직접 입력"(자유 텍스트가 있으면 그대로 저장)
   - 파일: `CarSignals`(기어·누적 거리·내비 주소), `Logbook`(`Segment`, 구간 합치기, 저장), `Commands`(의도·예/아니오·운행 구분 파서), `Voice`(TTS·STT, 데모 스크립트), `ParkingText`(층/기둥 파서), `Trip`(모델·`smsBody`·`smsQrText`·저장), `Qr`, `MainActivity`(홈/정리/운행기록부)
   - 휴대폰 전달: QR = `SMSTO:<내 번호>:<본문>`. **아이폰 실기기에서 받는 사람·본문이 채워진 문자 작성 화면이 열리는 것 확인(2026-11-01)**. 번호 없는 `sms:` 링크는 아이폰에서 "연락처에 추가"만 떠서 실패. 내 번호는 운행기록부 화면에서 입력(SharedPreferences)
+  - 월간 운행기록부(2026-11-02): 운행기록부 화면 "월간 운행기록부" 탭 → 월별 합계·업무사용비율 + 링크 QR. `LogbookLink`가 `{"v":1,"m":"YYYY-MM","t":[[시작분,출발km×10,도착km×10,"C|B|P",도착지]]}`를 raw deflate + base64url로 `BASE_URL#…`에 담음. `viewer/index.html`(정적, `DecompressionStream('deflate-raw')`)이 휴대폰에서 국세청 양식 표·CSV·인쇄 제공, 상호·차량번호·성명 등은 휴대폰 localStorage에만. `BASE_URL`(`https://ysna629.github.io/arrival-note/`)에 페이지 공개 필요(본 저장소는 비공개라 Pages 불가)
   - 테스트: `sh ./gradlew testDebugUnitTest` (ParkingText·Commands·Logbook·SMS 본문)
   - 개인정보 동의(`Consent.kt`): 첫 실행 시 수집 항목(음성·차량 정보·위치·휴대폰 번호)과 용도·보관(차량 안에만, 서버 전송 없음)·철회 방법을 보여 주고 "동의하고 시작" 버튼으로만 동의. 동의 전에는 차량·마이크·내비를 읽지 않음. 상단 "동의 철회" → 수집 중단 + 기록·번호 전부 삭제(`TripStore.clearAll`). 문구 바뀌면 `Consent.VERSION` 올리기
   - 안정성 처리(2026-11-01): 주차 위치는 "…, 저장할까요?" 음성 확인 후 저장. TTS가 끝난 뒤(onDone+0.4초)에만 마이크를 열고, 앱 질문이 되들린 STT 결과(에코)는 한 번 무시하고 다시 들음. 주행 중(P 아님)에는 운행일지 정리·텍스트 입력 불가(진행 중이면 중단), "주차 어디"는 가능. 앱 재시작 시 열린 구간을 이어서 닫고, 누적 거리 없이(0) 기록된 출발값은 첫 odometer 값으로 채움 + merge에서 0·감소 구간 제외

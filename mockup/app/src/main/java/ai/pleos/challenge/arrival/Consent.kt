@@ -8,7 +8,7 @@ import android.content.Context
  */
 object Consent {
     /** Bump when the collected items change so everyone is asked again. */
-    const val VERSION = 1
+    const val VERSION = 2
 
     data class Item(val title: String, val detail: String)
 
@@ -19,7 +19,7 @@ object Consent {
         Item("휴대폰 번호 (입력한 경우)", "문자 QR의 받는 사람으로만 써요."),
     )
 
-    const val STORAGE = "모든 기록은 이 차량 안에만 저장되고 외부 서버로 보내지 않아요. 문자는 직접 보내기를 누를 때만 내 휴대폰에서 발송돼요."
+    const val STORAGE = "모든 기록은 이 차량 안에만 저장되고 외부 서버로 보내지 않아요. 문자는 직접 보내기를 누를 때만 내 휴대폰에서 발송돼요. 월간 운행기록부 QR은 기록을 링크 안에 담아 내 휴대폰 브라우저에서만 펼쳐요(웹 서버로 전송되지 않음)."
     const val WITHDRAW = "화면 위쪽의 '동의 철회'를 누르면 바로 수집을 멈추고 저장된 기록을 모두 지워요."
 }
 

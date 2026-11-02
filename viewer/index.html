@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>도착노트 운행기록부</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #14181f; --muted: #5d6673; --line: #dfe3e8;
+    --accent: #0a7f6f; --accent-ink: #ffffff; --warn: #b4441b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1216; --panel: #181c22; --ink: #eef1f4; --muted: #9aa4b0; --line: #2a3038;
+      --accent: #3cc9b3; --accent-ink: #0f1216; --warn: #f08a5d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 20px 16px 48px; }
+  header p { margin: 2px 0 0; color: var(--muted); }
+  h1 { font-size: 22px; margin: 0; }
+  h2 { font-size: 15px; color: var(--muted); font-weight: 600; margin: 0 0 10px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-top: 14px; }
+  .summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .summary div { min-width: 0; }
+  .summary b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .summary span { color: var(--muted); font-size: 13px; }
+  .summary .ratio b { color: var(--accent); }
+  .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  label { display: block; font-size: 13px; color: var(--muted); }
+  input {
+    width: 100%; margin-top: 4px; padding: 9px 10px; font: inherit; color: var(--ink);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  }
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -16px; padding: 0 16px; }
+  table { border-collapse: collapse; width: 100%; min-width: 720px; font-variant-numeric: tabular-nums; }
+  th, td { border: 1px solid var(--line); padding: 7px 8px; text-align: center; white-space: nowrap; }
+  th { font-size: 13px; color: var(--muted); font-weight: 600; background: var(--bg); }
+  td.num { text-align: right; }
+  td.note { text-align: left; white-space: normal; min-width: 140px; }
+  tfoot td { font-weight: 700; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  button {
+    font: inherit; font-weight: 600; padding: 11px 16px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .note-text { color: var(--muted); font-size: 13px; margin-top: 14px; }
+  .error { color: var(--warn); }
+  .print-only { display: none; }
+  @media (max-width: 420px) {
+    .fields { grid-template-columns: 1fr; }
+    .summary b { font-size: 17px; }
+  }
+  @media print {
+    :root { --bg: #fff; --panel: #fff; --ink: #000; --muted: #333; --line: #888; --accent: #000; }
+    .actions, .note-text, .no-print { display: none; }
+    .print-only { display: block; }
+    section { border: 0; padding: 0; }
+    table { min-width: 0; font-size: 11px; }
+    .scroll { overflow: visible; margin: 0; padding: 0; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>업무용승용차 운행기록부</h1>
+    <p id="period">기록을 여는 중…</p>
+  </header>
+
+  <div id="content" hidden>
+    <section class="summary-section">
+      <div class="summary">
+        <div><b id="total">-</b><span>총주행거리</span></div>
+        <div><b id="work">-</b><span>업무용 사용거리</span></div>
+        <div class="ratio"><b id="ratio">-</b><span>업무사용비율</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>기본 정보 <span class="no-print">(이 휴대폰에만 저장돼요)</span></h2>
+      <div class="fields" id="fields"></div>
+    </section>
+
+    <section>
+      <h2>운행 내역</h2>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th rowspan="2">사용일자(요일)</th>
+              <th rowspan="2">사용자<br>(부서/성명)</th>
+              <th colspan="3">운행내역</th>
+              <th colspan="2">업무용 사용거리(km)</th>
+              <th rowspan="2">비고</th>
+            </tr>
+            <tr>
+              <th>주행 전 계기판<br>거리(km)</th>
+              <th>주행 후 계기판<br>거리(km)</th>
+              <th>주행거리(km)</th>
+              <th>출·퇴근용</th>
+              <th>일반 업무용</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4">합계</td>
+              <td class="num" id="f-total"></td>
+              <td class="num" id="f-commute"></td>
+              <td class="num" id="f-business"></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="actions">
+        <button class="primary" id="csv">엑셀(CSV)로 저장</button>
+        <button id="print">인쇄 · PDF</button>
+      </div>
+      <p class="note-text">운행 기록은 이 링크 안에 들어 있고, 이 페이지는 휴대폰 안에서만 표를 그려요. 기록은 서버로 전송되지 않아요.</p>
+    </section>
+  </div>
+</main>
+
+<script>
+(() => {
+  const FIELDS = [
+    ["company", "상호(법인명)"], ["bizNo", "사업자등록번호"], ["model", "차종"],
+    ["plate", "자동차등록번호"], ["dept", "부서"], ["name", "성명"],
+  ];
+  const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
+  const $ = (id) => document.getElementById(id);
+  const fmt = (km) => km.toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+  const storage = {
+    get(key) { try { return localStorage.getItem(key) || ""; } catch { return ""; } },
+    set(key, value) { try { localStorage.setItem(key, value); } catch {} },
+  };
+
+  async function decode(hash) {
+    const b64 = hash.replace(/-/g, "+").replace(/_/g, "/");
+    const bin = atob(b64 + "===".slice((b64.length + 3) % 4));
+    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return JSON.parse(await new Response(stream).text());
+  }
+
+  function toTrips(data) {
+    return data.t.map(([minute, from, to, purpose, note]) => {
+      const startKm = from / 10, endKm = to / 10;
+      const distance = Math.max(0, endKm - startKm);
+      return {
+        date: new Date(minute * 60000), startKm, endKm, distance,
+        commute: purpose === "C" ? distance : 0,
+        business: purpose === "B" ? distance : 0,
+        note: purpose === "P" ? ["비업무", note].filter(Boolean).join(" · ") : note,
+      };
+    });
+  }
+
+  function user() {
+    return [storage.get("dept"), storage.get("name")].filter(Boolean).join("/");
+  }
+
+  function render(month, trips) {
+    const [y, m] = month.split("-").map(Number);
+    $("period").textContent = `${y}년 ${m}월 · ${trips.length}건`;
+    const sum = (key) => trips.reduce((acc, t) => acc + t[key], 0);
+    const total = sum("distance"), commute = sum("commute"), business = sum("business");
+    const work = commute + business;
+    $("total").textContent = `${fmt(total)} km`;
+    $("work").textContent = `${fmt(work)} km`;
+    $("ratio").textContent = total > 0 ? `${(work / total * 100).toFixed(1)}%` : "-";
+    $("f-total").textContent = fmt(total);
+    $("f-commute").textContent = fmt(commute);
+    $("f-business").textContent = fmt(business);
+
+    const tbody = $("rows");
+    tbody.replaceChildren(...trips.map((t) => {
+      const tr = document.createElement("tr");
+      const cells = [
+        [`${t.date.getMonth() + 1}/${String(t.date.getDate()).padStart(2, "0")}(${DAYS[t.date.getDay()]})`, ""],
+        [user(), ""],
+        [fmt(t.startKm), "num"], [fmt(t.endKm), "num"], [fmt(t.distance), "num"],
+        [t.commute ? fmt(t.commute) : "", "num"], [t.business ? fmt(t.business) : "", "num"],
+        [t.note, "note"],
+      ];
+      cells.forEach(([text, cls]) => {
+        const td = document.createElement("td");
+        td.textContent = text;
+        if (cls) td.className = cls;
+        tr.append(td);
+      });
+      return tr;
+    }));
+    return { y, m, total, work, commute, business };
+  }
+
+  function csv(month, trips, totals) {
+    const q = (v) => `"${String(v).replace(/"/g, '""')}"`;
+    const lines = [
+      ["업무용승용차 운행기록부"],
+      ["사업연도", `${totals.y}년`, "기간", `${totals.y}년 ${totals.m}월`],
+      ...FIELDS.slice(0, 4).map(([key, label]) => [label, storage.get(key)]),
+      [],
+      ["사용일자(요일)", "사용자(부서/성명)", "주행 전 계기판의 거리(km)", "주행 후 계기판의 거리(km)", "주행거리(km)",
+        "출·퇴근용(km)", "일반 업무용(km)", "비고"],
+      ...trips.map((t) => [
+        `${t.date.getFullYear()}-${String(t.date.getMonth() + 1).padStart(2, "0")}-${String(t.date.getDate()).padStart(2, "0")}(${DAYS[t.date.getDay()]})`,
+        user(), t.startKm.toFixed(1), t.endKm.toFixed(1), t.distance.toFixed(1),
+        t.commute ? t.commute.toFixed(1) : "", t.business ? t.business.toFixed(1) : "", t.note,
+      ]),
+      [],
+      ["과세기간 총주행 거리(km)", totals.total.toFixed(1)],
+      ["과세기간 업무용 사용거리(km)", totals.work.toFixed(1)],
+      ["업무사용비율(%)", totals.total > 0 ? (totals.work / totals.total * 100).toFixed(1) : ""],
+    ];
+    const text = "﻿" + lines.map((row) => row.map(q).join(",")).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+    a.download = `운행기록부_${month}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  async function main() {
+    const hash = location.hash.slice(1);
+    if (!hash) {
+      $("period").innerHTML = '<span class="error">기록이 없는 링크예요. 차량 화면의 QR 코드를 다시 스캔해 주세요.</span>';
+      return;
+    }
+    let data;
+    try {
+      data = await decode(hash);
+      if (data.v !== 1) throw new Error("version");
+    } catch {
+      $("period").innerHTML = '<span class="error">기록을 읽지 못했어요. QR 코드를 다시 스캔하거나 브라우저를 최신으로 업데이트해 주세요.</span>';
+      return;
+    }
+    const trips = toTrips(data);
+    let totals = render(data.m, trips);
+
+    const fields = $("fields");
+    FIELDS.forEach(([key, label]) => {
+      const wrap = document.createElement("label");
+      wrap.textContent = label;
+      const input = document.createElement("input");
+      input.value = storage.get(key);
+      input.addEventListener("input", () => {
+        storage.set(key, input.value.trim());
+        if (key === "dept" || key === "name") totals = render(data.m, trips);
+      });
+      wrap.append(input);
+      fields.append(wrap);
+    });
+
+    $("csv").addEventListener("click", () => csv(data.m, trips, totals));
+    $("print").addEventListener("click", () => window.print());
+    $("content").hidden = false;
+  }
+
+  main();
+})();
+</script>
+</body>
+</html>

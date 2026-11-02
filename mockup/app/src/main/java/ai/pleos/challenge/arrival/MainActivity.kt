@@ -776,6 +776,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun RecordsScreen() {
         var selected by remember { mutableStateOf(0) }
+        var monthly by remember { mutableStateOf(false) }
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             Card(Modifier.weight(1.6f)) {
                 Label("업무용승용차 운행기록부")
@@ -809,44 +810,79 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-            Card(Modifier.weight(1f)) {
+            Card(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                 Label("휴대폰으로 받기")
-                val trip = trips.getOrNull(selected)
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { value ->
-                        phone = value.filter { it.isDigit() || it == '-' }.take(13)
-                        store.phone = phone
-                    },
-                    label = { Text(if (parked == false) "내 휴대폰 번호 (정차 중에만 입력)" else "내 휴대폰 번호") },
-                    // Typing is for a parked car only (driver distraction guideline).
-                    enabled = parked != false,
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(12.dp))
-                when {
-                    trip == null -> Body("기록이 생기면 QR 코드가 나타나요.")
-                    phone.count(Char::isDigit) < 10 -> Body("내 번호를 입력하면 QR로 문자를 보낼 수 있어요.")
-                    else -> {
-                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Image(qrBitmap(trip.smsQrText(phone)).asImageBitmap(), contentDescription = "문자 보내기 QR 코드", modifier = Modifier.size(240.dp))
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        Body("휴대폰 카메라로 스캔하면 문자 앱이 열려요. 보내면 내 문자함에 저장돼요.")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+                    FilterChip(selected = !monthly, onClick = { monthly = false }, label = { Text("이번 운행 · 문자", fontSize = 18.sp) })
+                    FilterChip(selected = monthly, onClick = { monthly = true }, label = { Text("월간 운행기록부", fontSize = 18.sp) })
+                }
+                if (monthly) MonthlyShare() else TripShare(trips.getOrNull(selected))
+            }
+        }
+    }
+
+    /** One month as a link QR: the phone opens the NTS table and can save it as a spreadsheet. */
+    @Composable
+    private fun MonthlyShare() {
+        val months = LogbookLink.months(trips)
+        if (months.isEmpty()) return Body("기록이 생기면 QR 코드가 나타나요.")
+        var index by remember { mutableStateOf(0) }
+        val month = months[index.coerceIn(months.indices)]
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { index++ }, enabled = index < months.lastIndex) { Text("◀", fontSize = 20.sp) }
+            Text("${month.year}년 ${month.monthValue}월", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            TextButton(onClick = { index-- }, enabled = index > 0) { Text("▶", fontSize = 20.sp) }
+        }
+        val inMonth = LogbookLink.tripsIn(trips, month)
+        val sum = LogbookLink.summary(inMonth)
+        Body("${inMonth.size}건 · 총 ${km(sum.totalKm)} · 업무용 ${km(sum.workKm)}", color = Color.White)
+        Body(String.format(Locale.KOREA, "업무사용비율 %.1f%%", sum.ratio), color = Accent)
+        Spacer(Modifier.height(12.dp))
+        val url = remember(month, inMonth) { LogbookLink.url(trips, month) }
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Image(qrBitmap(url, 640).asImageBitmap(), contentDescription = "월간 운행기록부 QR 코드", modifier = Modifier.size(300.dp))
+        }
+        Spacer(Modifier.height(12.dp))
+        Body("휴대폰 카메라로 스캔하면 국세청 운행기록부 양식으로 열려요. 엑셀로 받거나 인쇄할 수 있어요.")
+    }
+
+    @Composable
+    private fun TripShare(trip: Trip?) {
+        Column {
+            OutlinedTextField(
+                value = phone,
+                onValueChange = { value ->
+                    phone = value.filter { it.isDigit() || it == '-' }.take(13)
+                    store.phone = phone
+                },
+                label = { Text(if (parked == false) "내 휴대폰 번호 (정차 중에만 입력)" else "내 휴대폰 번호") },
+                // Typing is for a parked car only (driver distraction guideline).
+                enabled = parked != false,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(12.dp))
+            when {
+                trip == null -> Body("기록이 생기면 QR 코드가 나타나요.")
+                phone.count(Char::isDigit) < 10 -> Body("내 번호를 입력하면 QR로 문자를 보낼 수 있어요.")
+                else -> {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Image(qrBitmap(trip.smsQrText(phone)).asImageBitmap(), contentDescription = "문자 보내기 QR 코드", modifier = Modifier.size(240.dp))
                     }
-                }
-                if (trip != null) {
                     Spacer(Modifier.height(12.dp))
-                    Label("보낼 문자")
-                    Text(
-                        trip.smsBody(),
-                        fontSize = 17.sp,
-                        color = Color.White,
-                        modifier = Modifier.fillMaxWidth().background(Line, RoundedCornerShape(8.dp)).padding(12.dp),
-                    )
+                    Body("휴대폰 카메라로 스캔하면 문자 앱이 열려요. 보내면 내 문자함에 저장돼요.")
                 }
+            }
+            if (trip != null) {
+                Spacer(Modifier.height(12.dp))
+                Label("보낼 문자")
+                Text(
+                    trip.smsBody(),
+                    fontSize = 17.sp,
+                    color = Color.White,
+                    modifier = Modifier.fillMaxWidth().background(Line, RoundedCornerShape(8.dp)).padding(12.dp),
+                )
             }
         }
     }

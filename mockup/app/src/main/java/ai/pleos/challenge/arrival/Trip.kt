@@ -66,10 +66,10 @@ data class Trip(
 }
 
 /** Usage categories of the NTS business-vehicle logbook (업무용승용차 운행기록부). */
-enum class Purpose(val label: String, val short: String) {
-    COMMUTE("출퇴근", "출퇴근"),
-    BUSINESS("일반 업무", "업무"),
-    PERSONAL("비업무", "비업무"),
+enum class Purpose(val label: String, val short: String, val code: Char) {
+    COMMUTE("출퇴근", "출퇴근", 'C'),
+    BUSINESS("일반 업무", "업무", 'B'),
+    PERSONAL("비업무", "비업무", 'P'),
 }
 
 fun km(value: Float): String = String.format(Locale.KOREA, "%,.1fkm", value)
