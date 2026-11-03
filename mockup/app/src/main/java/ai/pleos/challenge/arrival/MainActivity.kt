@@ -849,7 +849,11 @@ class MainActivity : ComponentActivity() {
         Body("${inMonth.size}건 · 총 ${km(sum.totalKm)} · 업무용 ${km(sum.workKm)}", color = Color.White)
         Body(String.format(Locale.KOREA, "업무사용비율 %.1f%%", sum.ratio), color = Accent)
         Spacer(Modifier.height(12.dp))
-        val url = remember(month, inMonth) { LogbookLink.url(trips, month) }
+        val url = remember(month, inMonth) {
+            // e.g. --es viewer_url http://192.168.0.10:8765/ to try viewer/ from a laptop before it is published
+            LogbookLink.url(trips, month, base = intent.getStringExtra("viewer_url") ?: LogbookLink.BASE_URL)
+                .also { Log.i(TAG, "monthly ${it.length} chars $it") }
+        }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Image(qrBitmap(url, 640).asImageBitmap(), contentDescription = "월간 운행기록부 QR 코드", modifier = Modifier.size(300.dp))
         }

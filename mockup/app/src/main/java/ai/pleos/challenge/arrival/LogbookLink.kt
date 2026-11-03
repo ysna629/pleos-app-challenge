@@ -13,7 +13,7 @@ import java.util.zip.Deflater
  */
 object LogbookLink {
     /** Where `viewer/index.html` is published. */
-    const val BASE_URL = "https://ysna629.github.io/arrival-note/"
+    const val BASE_URL = "https://pleos-note.vercel.app/"
 
     data class Summary(val totalKm: Float, val commuteKm: Float, val businessKm: Float) {
         val workKm: Float get() = commuteKm + businessKm
@@ -53,10 +53,10 @@ object LogbookLink {
         append("]}")
     }
 
-    /** The link for [month]: raw-deflated payload in base64url after `#`. */
-    fun url(trips: List<Trip>, month: YearMonth, zone: ZoneId = ZoneId.systemDefault()): String {
+    /** The link for [month]: raw-deflated payload in base64url after `#`. [base] can point at a test server. */
+    fun url(trips: List<Trip>, month: YearMonth, zone: ZoneId = ZoneId.systemDefault(), base: String = BASE_URL): String {
         val bytes = payload(tripsIn(trips, month, zone), month).toByteArray(Charsets.UTF_8)
-        return BASE_URL + "#" + Base64.getUrlEncoder().withoutPadding().encodeToString(deflate(bytes))
+        return base + "#" + Base64.getUrlEncoder().withoutPadding().encodeToString(deflate(bytes))
     }
 
     private fun deflate(input: ByteArray): ByteArray {
