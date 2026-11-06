@@ -23,27 +23,31 @@ import android.util.Log
  */
 class CarSignals(
     context: Context,
-    private val onGear: (parked: Boolean) -> Unit,
+    private val onGear: (parked: Boolean?) -> Unit,
     private val onOdometer: (km: Float) -> Unit,
+    private val onLocation: (JourneyPoint) -> Unit = {},
 ) {
     private val vehicle = Vehicle(context)
     private val navi = NaviHelper(context)
-    private var lastAddress = ""
-    private var pendingAddress: ((String) -> Unit)? = null
+    @Volatile private var lastAddress = ""
+    private val pendingAddresses = mutableListOf<(String) -> Unit>()
     private val fused = FusedLocation(context)
 
     /** Latest GPS fix. Kept while driving so a car park without signal still gets the position at its entrance. */
     var lastFix: LocationData? = null
         private set
+    var journeyFix: JourneyPoint? = null
+        private set
 
     @Suppress("DEPRECATION")
     private val gearListener = object : GearSelectionListener {
         override fun onSelected(gear: VehicleGear?) {
-            if (gear != null && gear != VehicleGear.GEAR_UNKNOWN) onGear(gear == VehicleGear.GEAR_PARK)
+            onGear(if (gear == null || gear == VehicleGear.GEAR_UNKNOWN) null else gear == VehicleGear.GEAR_PARK)
         }
 
         override fun onFailed(e: Exception) {
             Log.w(TAG, "gear", e)
+            onGear(null)
         }
     }
 
@@ -60,14 +64,19 @@ class CarSignals(
     private val naviListener = object : NaviHelperEventListener {
         override fun onCurrentLocationInfo(info: CurrentLocationInfo) {
             lastAddress = info.address
-            pendingAddress?.invoke(info.address)
-            pendingAddress = null
+            val callbacks = synchronized(pendingAddresses) { pendingAddresses.toList().also { pendingAddresses.clear() } }
+            callbacks.forEach { it(info.address) }
         }
     }
 
     private val fusedListener = object : FusedLocationListener {
         override fun onChanged(location: LocationData?) {
-            if (location != null) lastFix = location
+            if (location != null) {
+                lastFix = location
+                val point = JourneyPoint(location.latitude, location.longitude, location.timestampMillis)
+                journeyFix = point
+                onLocation(point)
+            }
         }
 
         override fun onError(e: Exception) {
@@ -99,11 +108,15 @@ class CarSignals(
 
     /** Asks NaviHelper for the current address; falls back to the last known one. */
     fun requestAddress(callback: (String) -> Unit) {
-        pendingAddress = callback
-        runCatching { navi.getCurrentLocationInfo() }.onFailure { callback(lastAddress) }
+        synchronized(pendingAddresses) { pendingAddresses.add(callback) }
+        runCatching { navi.getCurrentLocationInfo() }.onFailure {
+            synchronized(pendingAddresses) { pendingAddresses.remove(callback) }
+            callback(lastAddress)
+        }
     }
 
     fun stop() {
+        synchronized(pendingAddresses) { pendingAddresses.clear() }
         @Suppress("DEPRECATION")
         runCatching { vehicle.getGear().unregisterGearSelection(gearListener) }
         runCatching { vehicle.getOdometer().unregisterDistanceDriven(odometerListener) }

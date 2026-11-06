@@ -40,6 +40,13 @@ class LogbookTest {
 }
 
 class CommandsTest {
+    @Test fun familySharingVoiceCommandsStaySeparateFromBusinessLogbook() {
+        assertEquals("SHOW_JOURNEY_QR", Commands.parseIntent("여행 기록 휴대폰으로 보여 줘").name)
+        assertEquals("SHOW_JOURNEY_QR", Commands.parseIntent("큐알 보여줘").name)
+        assertEquals("EXPORT_JOURNEY_CSV", Commands.parseIntent("여행 기록 엑셀로 내보내 줘").name)
+        assertEquals("SAVE_PLACE", Commands.parseIntent("여기 기억해 줘").name)
+    }
+
     @Test
     fun intent() {
         assertEquals(Intent.LOGBOOK, Commands.parseIntent("운행일지 정리해줘"))
@@ -49,6 +56,9 @@ class CommandsTest {
         assertEquals(Intent.WHERE_PARKED, Commands.parseIntent("주차 위치 알려줘"))
         assertEquals(Intent.UNKNOWN, Commands.parseIntent("노래 틀어줘"))
         assertEquals(Intent.UNKNOWN, Commands.parseIntent(""))
+        assertEquals(Intent.JOURNEY, Commands.parseIntent("여행 기록 보여줘"))
+        assertEquals(Intent.JOURNEY, Commands.parseIntent("나들이 지도"))
+        assertEquals(Intent.SAVE_PLACE, Commands.parseIntent("여기 저장해 줘"))
     }
 
     @Test

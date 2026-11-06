@@ -8,6 +8,8 @@ import android.os.Looper
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -57,6 +59,12 @@ import androidx.compose.ui.unit.sp
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Mockup of the arrival assistant. Recording is automatic and silent; organizing happens on request.
@@ -72,11 +80,11 @@ import java.util.Locale
  */
 class MainActivity : ComponentActivity() {
 
-    private enum class Screen { HOME, LOGBOOK, RECORDS }
+    private enum class Screen { HOME, LOGBOOK, RECORDS, JOURNEY }
 
     /** ASK_* speaks a question, HEAR_* listens for the answer, CHOOSE_* waits for a tap after voice failed. */
     private enum class Step {
-        IDLE, HEAR_COMMAND,
+        IDLE, HEAR_COMMAND, ASK_JOURNEY_NOTE, HEAR_JOURNEY_NOTE,
         ASK_PURPOSE, HEAR_PURPOSE, CHOOSE_PURPOSE,
         ASK_PARK, HEAR_PARK, CHOOSE_PARK,
         ASK_FLOOR, HEAR_FLOOR, ASK_PILLAR, HEAR_PILLAR, ASK_CONFIRM, HEAR_CONFIRM, REVIEW_SPOT,
@@ -86,6 +94,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var store: TripStore
     private lateinit var segmentStore: SegmentStore
     private lateinit var consentStore: ConsentStore
+    private lateinit var journeyStore: JourneyStore
     private lateinit var car: CarSignals
     private lateinit var voice: Voice
 
@@ -112,9 +121,53 @@ class MainActivity : ComponentActivity() {
     private var declined by mutableStateOf(false)
     private var confirmWithdraw by mutableStateOf(false)
     private var running = false
+    private var collectionGeneration = 0
+    private var journeyShareRequest by mutableStateOf<JourneyShareMode?>(null)
+    private var journeyPreview by mutableStateOf(false)
+    private var journeyNoteTarget: Pair<String, String>? = null
+    private var journeyFeedback by mutableStateOf("")
+    private val journeys = mutableStateListOf<Journey>()
     private var listenToken = 0
     private val trips = mutableStateListOf<Trip>()
     private val segments = mutableStateListOf<Segment>()
+    private var exportMessage by mutableStateOf("")
+    private var pendingJourneyExport: Pair<JourneyExport.Snapshot, Int>? = null
+    private var journeyExportJob: Job? = null
+    private val saveJourneyDocument = registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        val pending = pendingJourneyExport
+        pendingJourneyExport = null
+        if (pending == null) return@registerForActivityResult
+        if (uri == null) {
+            if (running && consented && pending.second == collectionGeneration) exportMessage = "파일 저장을 취소했어요. 차량에서 저장창을 사용할 수 없다면 휴대폰 QR을 이용해 주세요."
+            return@registerForActivityResult
+        }
+        if (!running || !consented || parked != true || pending.second != collectionGeneration) {
+            exportMessage = "P 상태에서 다시 내보내 주세요."
+            return@registerForActivityResult
+        }
+        journeyExportJob = lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val bytes = pending.first.csv().toByteArray(Charsets.UTF_8)
+                    currentCoroutineContext().ensureActive()
+                    val stream = contentResolver.openOutputStream(uri, "wt") ?: error("저장 위치를 열 수 없어요.")
+                    stream.use {
+                        var offset = 0
+                        while (offset < bytes.size) {
+                            currentCoroutineContext().ensureActive()
+                            val count = minOf(4096, bytes.size - offset)
+                            it.write(bytes, offset, count)
+                            offset += count
+                        }
+                    }
+                }
+                if (running && consented && pending.second == collectionGeneration) exportMessage = "CSV 파일을 저장했어요."
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) {
+                if (running && consented && pending.second == collectionGeneration) exportMessage = "파일을 저장하지 못했어요. 다른 위치를 선택하거나 휴대폰 QR을 이용해 주세요."
+            }
+        }
+    }
 
     private val listening get() = step.name.startsWith("HEAR_")
 
@@ -127,6 +180,10 @@ class MainActivity : ComponentActivity() {
         phone = store.phone
         mapApp = store.mapApp
         consentStore = ConsentStore(this)
+        journeyStore = JourneyStore(this)
+        journeys.addAll(journeyStore.load().map { it.resume() })
+        journeyPreview = intent.getBooleanExtra("journey_demo", false)
+        if (journeyPreview) screen = Screen.JOURNEY
         consented = consentStore.granted
         if (consented) startCollecting()
 
@@ -137,14 +194,21 @@ class MainActivity : ComponentActivity() {
     private fun startCollecting() {
         if (running) return
         running = true
+        val generation = ++collectionGeneration
         val missing = listOf(Manifest.permission.RECORD_AUDIO, FUSED_LOCATION)
             .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), 1)
 
         car = CarSignals(
             applicationContext,
-            onGear = { isParked -> runOnUiThread { onGearChanged(isParked) } },
-            onOdometer = { km -> runOnUiThread { onOdometer(km) } },
+            onGear = { isParked -> runOnUiThread { if (running && generation == collectionGeneration) onGearChanged(isParked) } },
+            onOdometer = { km -> runOnUiThread { if (running && generation == collectionGeneration) onOdometer(km) } },
+            onLocation = { point -> runOnUiThread {
+                if (running && generation == collectionGeneration && point.isFresh(System.currentTimeMillis())) {
+                    parked?.let { captureJourneyGear(it, System.currentTimeMillis()) }
+                    updateActiveJourney { it.recordLocation(point) }
+                }
+            } },
         )
         voice = Voice(
             applicationContext,
@@ -154,20 +218,29 @@ class MainActivity : ComponentActivity() {
                 intent.getBooleanExtra("demo_audio", false) -> DEMO_SCRIPT
                 else -> emptyList()
             },
-            onSpoken = { runOnUiThread { onSpoken() } },
+            onSpoken = { runOnUiThread { if (running && generation == collectionGeneration) onSpoken() } },
             onListening = {},
-            onHeard = { text, isFinal -> runOnUiThread { onHeard(text, isFinal) } },
-            onError = { message -> runOnUiThread { onVoiceError(message) } },
+            onHeard = { text, isFinal -> runOnUiThread { if (running && generation == collectionGeneration) onHeard(text, isFinal) } },
+            onError = { message -> runOnUiThread { if (running && generation == collectionGeneration) onVoiceError(message) } },
         )
         car.start()
         voice.start()
         // The Vehicle Service binds asynchronously; register listeners once it is up.
-        handler.postDelayed({ if (running) car.startListeners() }, 2000)
+        handler.postDelayed({ if (running && generation == collectionGeneration) car.startListeners() }, 2000)
     }
 
     private fun stopCollecting() {
         if (!running) return
         running = false
+        collectionGeneration++
+        listenToken++
+        pendingJourneyExport = null
+        journeyExportJob?.cancel()
+        // Persist a break rather than inventing movement or visit duration while the activity is absent.
+        val interrupted = journeys.map { it.resume() }
+        journeys.clear()
+        journeys.addAll(interrupted)
+        journeyStore.save(journeys)
         handler.removeCallbacksAndMessages(null)
         voice.release()
         car.stop()
@@ -187,6 +260,11 @@ class MainActivity : ComponentActivity() {
         store.clearAll()
         trips.clear()
         segments.clear()
+        journeys.clear()
+        journeyNoteTarget = null
+        journeyFeedback = ""
+        journeyShareRequest = null
+        exportMessage = ""
         phone = ""
         draft = null
         step = Step.IDLE
@@ -210,9 +288,20 @@ class MainActivity : ComponentActivity() {
 
     // ---- Silent recording ----
 
-    private fun onGearChanged(isParked: Boolean) {
+    private fun onGearChanged(isParked: Boolean?) {
         val wasParked = parked
         parked = isParked
+        if (isParked != true) {
+            pendingJourneyExport = null
+            journeyShareRequest = null
+            journeyExportJob?.cancel()
+        }
+        if (isParked == null) {
+            showBanner = false
+            stopLogbookWhileDriving()
+            return
+        }
+        captureJourneyGear(isParked, System.currentTimeMillis())
         val open = segments.indexOfLast { !it.isClosed }
         Log.i(TAG, "gear parked=$isParked odometer=$odometer open=$open")
         if (!isParked && open < 0) {
@@ -228,7 +317,11 @@ class MainActivity : ComponentActivity() {
             car.requestAddress { address -> runOnUiThread { updateSegment(open) { it.copy(arriveAddress = address) } } }
             showBanner = step == Step.IDLE
         }
-        if (!isParked && wasParked == true) stopLogbookWhileDriving()
+        if (!isParked) {
+            showBanner = false
+            stopLogbookWhileDriving()
+        }
+        if (isParked && wasParked != true) requestJourneyAddress()
     }
 
     /** The logbook flow (questions, pickers, keyboard) is for a parked car only; driving cancels it. */
@@ -236,6 +329,7 @@ class MainActivity : ComponentActivity() {
         if (step == Step.IDLE || step == Step.HEAR_COMMAND) return
         listenToken++
         voice.stopListening()
+        journeyNoteTarget = null
         draft = null
         screen = Screen.HOME
         showBanner = false
@@ -251,12 +345,84 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateSegment(index: Int, change: (Segment) -> Segment) {
-        if (index !in segments.indices) return
+        if (!running || index !in segments.indices) return
         segments[index] = change(segments[index])
         saveSegments()
     }
 
     private fun saveSegments() = segmentStore.save(segments)
+
+    // ---- Family journeys, kept separately from business logbook rows ----
+
+    private fun updateActiveJourney(change: (Journey) -> Journey) {
+        val index = journeys.indexOfFirst { it.endedAt == null }
+        if (index < 0) return
+        val updated = change(journeys[index])
+        if (updated == journeys[index]) return
+        journeys[index] = updated
+        journeyStore.save(journeys)
+    }
+
+    private fun captureJourneyGear(isParked: Boolean, at: Long) {
+        if (!running || !consented) return
+        val updated = JourneyDays.onGear(journeys.toList(), isParked, at, car.journeyFix)
+        if (updated != journeys.toList()) {
+            journeys.clear()
+            journeys.addAll(updated)
+            journeyStore.save(journeys)
+        }
+    }
+
+    private fun requestJourneyAddress() {
+        val journey = journeys.firstOrNull { it.endedAt == null } ?: return
+        val stop = journey.stops.lastOrNull() ?: return
+        val generation = collectionGeneration
+        car.requestAddress { address -> runOnUiThread {
+            if (running && generation == collectionGeneration) {
+                val index = journeys.indexOfFirst { it.id == journey.id }
+                if (index >= 0) {
+                    journeys[index] = journeys[index].updateStop(stop.id) { it.copy(address = address) }
+                    journeyStore.save(journeys)
+                }
+            }
+        } }
+    }
+
+    private fun saveJourneyCsv(snapshot: JourneyExport.Snapshot) {
+        if (!running || !consented || parked != true || step != Step.IDLE || pendingJourneyExport != null) return
+        if (journeyExportJob?.isActive == true) { exportMessage = "CSV 파일을 저장하고 있어요."; return }
+        val destination = ActivityResultContracts.CreateDocument("text/csv").createIntent(this, snapshot.filename()).resolveActivity(packageManager)
+        // AAOS may resolve this action to its placeholder rather than an actual document picker.
+        if (destination == null || destination.packageName == "com.android.car.frameworkpackagestubs") {
+            exportMessage = "이 차량은 파일 저장창을 지원하지 않아요. 위 QR을 휴대폰으로 스캔해 CSV를 받아 주세요."
+            return
+        }
+        pendingJourneyExport = snapshot to collectionGeneration
+        exportMessage = "CSV를 저장할 위치를 선택해 주세요."
+        try { saveJourneyDocument.launch(snapshot.filename()) }
+        catch (_: android.content.ActivityNotFoundException) {
+            pendingJourneyExport = null
+            exportMessage = "이 차량에는 파일 저장창이 없어요. 휴대폰 QR로 CSV를 받아 주세요."
+        } catch (_: Exception) {
+            pendingJourneyExport = null
+            exportMessage = "저장창을 열지 못했어요. 휴대폰 QR을 이용해 주세요."
+        }
+    }
+
+    private fun updateJourneyStop(journeyId: String, stopId: String, change: (JourneyStop) -> JourneyStop) {
+        if (!running || parked != true) return
+        val index = journeys.indexOfFirst { it.id == journeyId }
+        if (index < 0) return
+        journeys[index] = journeys[index].updateStop(stopId, change)
+        journeyStore.save(journeys)
+    }
+
+    private fun recordJourneyNote(journeyId: String, stopId: String) {
+        if (!running || parked != true || step != Step.IDLE) return
+        journeyNoteTarget = journeyId to stopId
+        journeyFeedback = ""
+        say(Step.ASK_JOURNEY_NOTE, "이곳에서 기억하고 싶은 것을 말씀해 주세요.")
+    }
 
     // ---- Voice dialog ----
 
@@ -285,6 +451,7 @@ class MainActivity : ComponentActivity() {
             Step.ASK_FLOOR -> listenFor(Step.HEAR_FLOOR)
             Step.ASK_PILLAR -> listenFor(Step.HEAR_PILLAR)
             Step.ASK_CONFIRM -> listenFor(Step.HEAR_CONFIRM)
+            Step.ASK_JOURNEY_NOTE -> listenFor(Step.HEAR_JOURNEY_NOTE)
             else -> Unit
         }
     }
@@ -305,6 +472,7 @@ class MainActivity : ComponentActivity() {
 
     /** Mic button on the home screen: listen for a command. */
     private fun callAssistant() {
+        if (!running || !consented || step != Step.IDLE) return
         showBanner = false
         reply = ""
         heard = ""
@@ -348,17 +516,50 @@ class MainActivity : ComponentActivity() {
         Log.i(TAG, "$step heard \"$text\"")
         when (step) {
             Step.HEAR_COMMAND -> when (Commands.parseIntent(text)) {
-                Commands.Intent.LOGBOOK -> if (parked == false) {
+                Commands.Intent.LOGBOOK -> if (parked != true) {
                     reply = "운행일지는 정차한 뒤에 정리할 수 있어요."
                     say(Step.IDLE, reply)
                 } else {
                     startLogbook()
                 }
                 Commands.Intent.WHERE_PARKED -> answerWhereParked()
+                Commands.Intent.JOURNEY -> { screen = Screen.JOURNEY; step = Step.IDLE; journeyPreview = false }
+                Commands.Intent.SHOW_JOURNEY_QR, Commands.Intent.EXPORT_JOURNEY_CSV -> {
+                    if (parked != true) say(Step.IDLE, "정차한 뒤에 기록을 공유할 수 있어요.")
+                    else if (journeys.isEmpty() && !journeyPreview) say(Step.IDLE, "아직 경유지 기록이 없어요. 이동과 주차를 확인하면 자동으로 기록해요.")
+                    else {
+                        voice.stopListening()
+                        step = Step.IDLE
+                        screen = Screen.JOURNEY
+                        reply = ""
+                        journeyShareRequest = if (Commands.parseIntent(text) == Commands.Intent.EXPORT_JOURNEY_CSV) JourneyShareMode.CSV else JourneyShareMode.VIEW
+                    }
+                }
+                Commands.Intent.SAVE_PLACE -> {
+                    val journey = journeys.firstOrNull { it.endedAt == null }
+                    val stop = journey?.stops?.lastOrNull()
+                    if (journeyPreview) say(Step.IDLE, "예시 화면이에요. 실제 경유지를 저장하려면 예시 여행 보기를 꺼 주세요.")
+                    else if (parked == true && journey != null && stop != null) {
+                        updateJourneyStop(journey.id, stop.id) { it.copy(favorite = true) }
+                        step = Step.IDLE
+                        screen = Screen.JOURNEY
+                        recordJourneyNote(journey.id, stop.id)
+                    } else say(Step.IDLE, "정차한 뒤 현재 경유지를 저장해 주세요.")
+                }
                 Commands.Intent.UNKNOWN -> {
-                    reply = "운행일지 정리, 또는 주차 위치를 물어보세요."
+                    reply = "여기 기억해 줘, 휴대폰으로 보여 줘, 엑셀로 내보내 줘라고 말씀해 주세요."
                     say(Step.IDLE, reply)
                 }
+            }
+            Step.HEAR_JOURNEY_NOTE -> {
+                voice.stopListening()
+                val target = journeyNoteTarget
+                if (parked == true && target != null && text.isNotBlank()) {
+                    updateJourneyStop(target.first, target.second) { it.copy(note = text.trim().take(240)) }
+                    journeyFeedback = "메모를 저장했어요."
+                } else journeyFeedback = "메모를 듣지 못했어요. 다시 말하거나 직접 입력해 주세요."
+                journeyNoteTarget = null
+                step = Step.IDLE
             }
             Step.HEAR_PURPOSE -> {
                 val purpose = Commands.parsePurpose(text)
@@ -402,6 +603,7 @@ class MainActivity : ComponentActivity() {
     // ---- Logbook flow ----
 
     private fun startLogbook() {
+        if (!running || parked != true) return
         showBanner = false
         val trip = Logbook.merge(segments)
         if (trip == null) {
@@ -522,6 +724,17 @@ class MainActivity : ComponentActivity() {
                             Screen.HOME -> HomeScreen()
                             Screen.LOGBOOK -> LogbookScreen()
                             Screen.RECORDS -> RecordsScreen()
+                            Screen.JOURNEY -> JourneyScreen(
+                                journeys = journeys, parked = parked, preview = journeyPreview, onPreviewChange = { journeyPreview = it },
+                                onSpeak = ::callAssistant, listening = listening, voiceStatus = reply,
+                                shareRequest = journeyShareRequest, onShareRequestHandled = { journeyShareRequest = null },
+                                onUpdate = ::updateJourneyStop,
+                                onVoiceNote = ::recordJourneyNote, recording = step == Step.ASK_JOURNEY_NOTE || step == Step.HEAR_JOURNEY_NOTE,
+                                partial = partial, feedback = journeyFeedback,
+                                viewerBase = intent.getStringExtra("viewer_url") ?: LogbookLink.BASE_URL,
+                                exportMessage = exportMessage, onSaveCsv = ::saveJourneyCsv,
+                                onOpenExport = { exportMessage = "" }, busy = step != Step.IDLE,
+                            )
                         }
                     }
                     if (confirmWithdraw) WithdrawBanner() else if (showBanner) ArrivalBanner()
@@ -586,6 +799,7 @@ class MainActivity : ComponentActivity() {
             Spacer(Modifier.weight(1f))
             TextButton(onClick = { screen = Screen.HOME }) { Text("홈", fontSize = 20.sp) }
             TextButton(onClick = { screen = Screen.RECORDS }) { Text("운행기록부", fontSize = 20.sp) }
+            TextButton(onClick = { journeyPreview = false; screen = Screen.JOURNEY }) { Text("여행 기록", fontSize = 20.sp) }
             TextButton(onClick = { confirmWithdraw = true }) { Text("동의 철회", fontSize = 16.sp, color = Muted) }
         }
     }
@@ -626,7 +840,14 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun HomeScreen() {
-        Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            Row(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(16.dp)).padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("가족 나들이도 도착노트에", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Body("우연히 들른 맛집과 카페, 이동 경로와 한마디로 기억해요.")
+                }
+                Button(onClick = { journeyPreview = false; screen = Screen.JOURNEY }) { Text("여행 기록 열기", fontSize = 20.sp) }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Card(Modifier.weight(1f)) {
                     Label("계기판 누적 거리")
@@ -872,7 +1093,7 @@ class MainActivity : ComponentActivity() {
                 },
                 label = { Text(if (parked == false) "내 휴대폰 번호 (정차 중에만 입력)" else "내 휴대폰 번호") },
                 // Typing is for a parked car only (driver distraction guideline).
-                enabled = parked != false,
+                enabled = parked == true,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 modifier = Modifier.fillMaxWidth(),

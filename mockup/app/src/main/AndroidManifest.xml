@@ -20,6 +20,11 @@
 
     <queries>
         <package android:name="ai.pleos.playground.service.navi" />
+        <intent>
+            <action android:name="android.intent.action.CREATE_DOCUMENT" />
+            <category android:name="android.intent.category.OPENABLE" />
+            <data android:mimeType="text/csv" />
+        </intent>
     </queries>
 
     <application
