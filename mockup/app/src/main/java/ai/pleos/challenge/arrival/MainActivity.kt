@@ -1,7 +1,9 @@
 package ai.pleos.challenge.arrival
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -93,6 +95,7 @@ class MainActivity : ComponentActivity() {
     /** ASK_* speaks a question, HEAR_* listens for the answer, CHOOSE_* waits for a tap after voice failed. */
     private enum class Step {
         IDLE, HEAR_COMMAND, ASK_JOURNEY_NOTE, HEAR_JOURNEY_NOTE,
+        ASK_PARKED, HEAR_PARKED, ASK_ARRIVAL, HEAR_ARRIVAL,
         ASK_PURPOSE, HEAR_PURPOSE, CHOOSE_PURPOSE,
         ASK_PARK, HEAR_PARK, CHOOSE_PARK,
         ASK_FLOOR, HEAR_FLOOR, ASK_PILLAR, HEAR_PILLAR, ASK_SPOT_NOTE, HEAR_SPOT_NOTE, ASK_CONFIRM, HEAR_CONFIRM, REVIEW_SPOT,
@@ -129,6 +132,10 @@ class MainActivity : ComponentActivity() {
     private var declined by mutableStateOf(false)
     private var confirmWithdraw by mutableStateOf(false)
     private var running = false
+    /** False while another app covers this one; recording goes on, prompts go to a notification. */
+    private var visible = false
+    /** Unorganized distance when the arrival question was last asked; 0 once those segments are saved or dropped. */
+    private var askedAtKm = 0f
     private var collectionGeneration = 0
     private var journeyShareRequest by mutableStateOf<JourneyShareMode?>(null)
     private var journeyPreview by mutableStateOf(false)
@@ -220,8 +227,10 @@ class MainActivity : ComponentActivity() {
         if (running) return
         running = true
         val generation = ++collectionGeneration
-        val missing = listOf(Manifest.permission.RECORD_AUDIO, FUSED_LOCATION)
-            .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        val missing = listOfNotNull(
+            Manifest.permission.RECORD_AUDIO, FUSED_LOCATION,
+            Manifest.permission.POST_NOTIFICATIONS.takeIf { Build.VERSION.SDK_INT >= 33 },
+        ).filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), 1)
 
         car = CarSignals(
@@ -250,6 +259,9 @@ class MainActivity : ComponentActivity() {
         )
         car.start()
         voice.start()
+        // Navigation is usually in front while driving; a foreground service keeps the callbacks coming.
+        runCatching { startForegroundService(Intent(this, RecordingService::class.java)) }
+            .onFailure { Log.w(TAG, "recording service not started", it) }
         // The Vehicle Service binds asynchronously; register listeners once it is up.
         handler.postDelayed({ if (running && generation == collectionGeneration) car.startListeners() }, 2000)
     }
@@ -269,6 +281,8 @@ class MainActivity : ComponentActivity() {
         handler.removeCallbacksAndMessages(null)
         voice.release()
         car.stop()
+        stopService(Intent(this, RecordingService::class.java))
+        Notices.cancelArrival(this)
     }
 
     private fun agree() {
@@ -309,6 +323,30 @@ class MainActivity : ComponentActivity() {
         if (located && running) car.startLocation()
     }
 
+    override fun onStart() {
+        super.onStart()
+        visible = true
+        Notices.cancelArrival(this)
+    }
+
+    override fun onStop() {
+        visible = false
+        super.onStop()
+    }
+
+    /** A tap on the arrival notification: open straight into what was chosen. The launch extras stay on [getIntent]. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val action = intent.getStringExtra(Notices.EXTRA_ACTION) ?: return
+        Log.i(TAG, "notice action $action step=$step parked=$parked")
+        if (!running || !consented || step != Step.IDLE) return
+        when (action) {
+            Notices.ACTION_LOGBOOK -> if (parked == true) startLogbook()
+            Notices.ACTION_PARK -> startParkOnly()
+            Notices.ACTION_SPEAK -> callAssistant()
+        }
+    }
+
     override fun onDestroy() {
         drivingRestriction.stop()
         stopCollecting()
@@ -346,8 +384,20 @@ class MainActivity : ComponentActivity() {
             }
             car.requestAddress { address -> runOnUiThread { updateSegment(open) { it.copy(arriveAddress = address) } } }
             showBanner = step == Step.IDLE
+            // Another app is in front: say so there instead of waiting for the driver to come back.
+            val pending = Logbook.merge(segments)
+            // Coming to the front by itself is not an option: the system blocks it (BAL_BLOCK) even with the service running.
+            // Ask only after a real drive, and again only after another one, so shuffling in a car park stays quiet.
+            if (!visible && pending != null && pending.distanceKm - askedAtKm >= ASK_MIN_KM) {
+                askedAtKm = pending.distanceKm
+                Notices.showArrival(this, km(pending.distanceKm))
+                // The driver cannot see the banner behind the map, so ask aloud. P can also be a short stop,
+                // so check that first; silence just ends it.
+                if (step == Step.IDLE) say(Step.ASK_PARKED, "도착하셨나요?")
+            }
         }
         if (!isParked) {
+            Notices.cancelArrival(this)
             showBanner = false
             showParkingShare = false
             stopLogbookWhileDriving()
@@ -360,6 +410,11 @@ class MainActivity : ComponentActivity() {
         if (step == Step.IDLE || step == Step.HEAR_COMMAND) return
         listenToken++
         voice.stopListening()
+        if (step in setOf(Step.ASK_PARKED, Step.HEAR_PARKED, Step.ASK_ARRIVAL, Step.HEAR_ARRIVAL)) {
+            // Nothing was started yet, so there is nothing to announce.
+            step = Step.IDLE
+            return
+        }
         journeyNoteTarget = null
         draft = null
         parkOnly = false
@@ -498,6 +553,8 @@ class MainActivity : ComponentActivity() {
 
     private fun startAnswer() {
         when (step) {
+            Step.ASK_PARKED -> listenFor(Step.HEAR_PARKED)
+            Step.ASK_ARRIVAL -> listenFor(Step.HEAR_ARRIVAL)
             Step.ASK_PURPOSE -> listenFor(Step.HEAR_PURPOSE)
             Step.ASK_PARK -> listenFor(Step.HEAR_PARK)
             Step.ASK_FLOOR -> listenFor(Step.HEAR_FLOOR)
@@ -606,6 +663,24 @@ class MainActivity : ComponentActivity() {
                     say(Step.IDLE, reply)
                 }
             }
+            Step.HEAR_PARKED -> {
+                voice.stopListening()
+                step = Step.IDLE
+                when (Commands.parseParked(text).takeIf { parked == true }) {
+                    true -> say(Step.ASK_ARRIVAL, "운행일지 정리할까요?")
+                    false -> say(Step.IDLE, "알겠어요. 이어서 기록할게요.")
+                    null -> Unit
+                }
+            }
+            Step.HEAR_ARRIVAL -> {
+                voice.stopListening()
+                step = Step.IDLE
+                when (Commands.parseYesNo(text).takeIf { parked == true }) {
+                    true -> startLogbook()
+                    false -> say(Step.IDLE, "알겠어요. 필요할 때 불러 주세요.")
+                    null -> Unit
+                }
+            }
             Step.HEAR_JOURNEY_NOTE -> {
                 voice.stopListening()
                 val target = journeyNoteTarget
@@ -678,6 +753,7 @@ class MainActivity : ComponentActivity() {
             // Only short moves (or nothing) since the last entry: drop them so they never become a trip.
             segments.removeAll { it.isClosed }
             saveSegments()
+            askedAtKm = 0f
             reply = "정리할 운행이 없어요."
             screen = Screen.HOME
             say(Step.IDLE, reply)
@@ -704,6 +780,7 @@ class MainActivity : ComponentActivity() {
         store.save(trips)
         segments.removeAll { it.isClosed && it.departAt >= trip.startedAt && it.arriveAt!! <= trip.endedAt }
         saveSegments()
+        askedAtKm = 0f
         Log.i(TAG, "logbook saved ${trip.distanceKm}km ${purpose.label}")
         say(Step.ASK_PARK, "${purpose.short} 운행으로 저장했어요. 주차 위치도 기록할까요?")
     }
@@ -1454,6 +1531,7 @@ class MainActivity : ComponentActivity() {
         const val FUSED_LOCATION = "pleos.car.permission.FUSED_LOCATION"
         const val LISTEN_TIMEOUT_MS = 10_000L
         const val MAX_PARKING_NOTES = 20
+        const val ASK_MIN_KM = 1.0f
         val FLOORS = listOf(-6, -5, -4, -3, -2, -1, 1, 2, 3)
         val LETTERS = ('A'..'Z').toList()
 

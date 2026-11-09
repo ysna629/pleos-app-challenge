@@ -15,6 +15,10 @@
     <uses-permission android:name="pleos.car.permission.STT_SERVICE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Keep recording while navigation is in front, and prompt when parked -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- AAOS GEAR_SELECTION -->
     <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
 
@@ -41,5 +45,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service
+            android:name=".RecordingService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Records trip start/end from vehicle gear and odometer signals while another app is displayed" />
+        </service>
     </application>
 </manifest>
