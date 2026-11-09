@@ -1,6 +1,8 @@
 package ai.pleos.challenge.arrival
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -114,5 +116,28 @@ class TripSmsTest {
     @Test
     fun smsQrText_addressesOwnNumber() {
         assertEquals("SMSTO:01012345678:" + trip.smsBody(), trip.smsQrText("010-1234-5678"))
+    }
+
+    @Test
+    fun spoken_readsPillarCodesInKorean() {
+        assertEquals("지하 5층 에이 4로 저장했어요.", ParkingText.spoken("지하 5층 A4로 저장했어요."))
+        assertEquals("지하 2층 비 15, 저장할까요?", ParkingText.spoken("지하 2층 B15, 저장할까요?"))
+        assertEquals("에이엘 공이", ParkingText.spoken("AL02"))
+        assertEquals("3층 씨 다시 3예요.", ParkingText.spoken("3층 C-3예요."))
+        assertEquals("몇 층이에요?", ParkingText.spoken("몇 층이에요?"))
+    }
+
+    @Test
+    fun placesWithoutFloorOrPillar() {
+        assertEquals("주차타워", ParkingText.towerLabel("주차타워에 넣었어"))
+        assertEquals("주차타워", ParkingText.towerLabel("기계식 주차장이야"))
+        assertEquals("주차타워 3번", ParkingText.towerLabel("삼번 타워"))
+        assertEquals("주차타워 12번", ParkingText.towerLabel("주차 타워 12호기"))
+        assertNull(ParkingText.towerLabel("지하 5층"))
+        assertTrue(ParkingText.isOutdoor("지상 주차장이야"))
+        assertTrue(ParkingText.isOutdoor("길가에 댔어"))
+        assertTrue(ParkingText.isOutdoor("야외"))
+        assertFalse(ParkingText.isOutdoor("지상 2층"))
+        assertFalse(ParkingText.isOutdoor("지하 오층"))
     }
 }
