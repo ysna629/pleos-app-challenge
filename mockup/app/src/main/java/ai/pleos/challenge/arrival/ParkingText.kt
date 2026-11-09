@@ -76,9 +76,24 @@ object ParkingText {
     /** Reads a whole sentence such as "지하 오층 에이 사에 주차했어" when the user answers in one go. */
     fun parseSentence(raw: String): Pair<Int?, String?> {
         val floor = parseFloor(raw)
-        val afterFloor = raw.substringAfter("층", missingDelimiterValue = raw)
-            .replace(Regex("(에\\s*)?(주차했어요?|주차함|댔어요?|세웠어요?)\\.?$"), "")
+        val afterFloor = raw.substringAfter("층", missingDelimiterValue = raw).replace(parkedVerb, "")
         return floor to parsePillar(afterFloor)
+    }
+
+    private val parkedVerb = Regex("(에\\s*)?(주차했어요?|주차함|댔어요?|세웠어요?)\\.?$")
+    private val leadingCopula = Regex("^(이고|이야|이에요|이요|예요|입니다|인데|요|야|에)(\\s+|$)")
+    private val trailingCopula = Regex("(이에요|이야|이요|예요|입니다|에요|야|요|에)$")
+
+    /**
+     * What was said after the floor when it is not a pillar code, e.g. "지하 1층 B동 앞에 주차했어" -> "B동 앞".
+     * A building spelled out by STT gets its letter back ("비동 앞" -> "B동 앞"). Null when nothing is left.
+     */
+    fun placeAfterFloor(raw: String): String? {
+        var rest = raw.substringAfter("층", missingDelimiterValue = "").trim().trimEnd('.', ',').replace(parkedVerb, "").trim()
+        rest = rest.replace(leadingCopula, "").replace(trailingCopula, "").trim()
+        if (rest.length < 2) return null
+        val building = letters.firstOrNull { rest.startsWith(it.first + "동") } ?: return rest
+        return "${building.second}동" + rest.removePrefix(building.first + "동")
     }
 
     const val TOWER = "주차타워"

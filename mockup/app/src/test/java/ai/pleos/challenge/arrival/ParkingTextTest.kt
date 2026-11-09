@@ -140,4 +140,18 @@ class TripSmsTest {
         assertFalse(ParkingText.isOutdoor("지상 2층"))
         assertFalse(ParkingText.isOutdoor("지하 오층"))
     }
+
+    @Test
+    fun placeAfterFloor_keepsDescription() {
+        assertEquals("B동 앞", ParkingText.placeAfterFloor("지하 1층 B동 앞에"))
+        assertEquals("B동 앞", ParkingText.placeAfterFloor("지하 일층 비동 앞에 주차했어"))
+        assertEquals("A동 엘리베이터 옆", ParkingText.placeAfterFloor("지하 2층이고 에이동 엘리베이터 옆이야"))
+        assertEquals("101동 앞", ParkingText.placeAfterFloor("지하 1층 101동 앞이에요."))
+        assertEquals("정문 쪽", ParkingText.placeAfterFloor("2층에 정문 쪽"))
+        assertNull(ParkingText.placeAfterFloor("지하 5층이야"))
+        assertNull(ParkingText.placeAfterFloor("지하 5층"))
+        assertNull(ParkingText.placeAfterFloor("주차타워"))
+        // A pillar code still wins over a description.
+        assertEquals(-5 to "A4", ParkingText.parseSentence("지하 오층 에이 사에 주차했어"))
+    }
 }
