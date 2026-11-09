@@ -19,7 +19,13 @@ android {
     // CarPropertyManager for gear changes (GEAR_SELECTION)
     useLibrary("android.car")
 
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
+
+    // Configure locally with ORG_GRADLE_PROJECT_kakaoRestApiKey or -PkakaoRestApiKey=...
+    val kakaoKey = providers.gradleProperty("kakaoRestApiKey").orNull.orEmpty()
+    defaultConfig {
+        buildConfigField("String", "KAKAO_REST_API_KEY", "\"${kakaoKey.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -44,4 +50,5 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

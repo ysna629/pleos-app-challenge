@@ -20,6 +20,11 @@
 
     <queries>
         <package android:name="ai.pleos.playground.service.navi" />
+        <intent>
+            <action android:name="android.intent.action.CREATE_DOCUMENT" />
+            <category android:name="android.intent.category.OPENABLE" />
+            <data android:mimeType="text/csv" />
+        </intent>
     </queries>
 
     <application
@@ -29,6 +34,8 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop">
+            <!-- While driving, MainActivity shows only DrivingScreen. Review it against Pleos DO rules before release. -->
+            <meta-data android:name="distractionOptimized" android:value="true" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

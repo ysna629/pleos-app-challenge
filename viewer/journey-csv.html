@@ -49,11 +49,11 @@
   </div>
 </main>
 <script type="module">
-import {decodeJourney, formatDate, visitRows, buildCsv, exportFilename} from './journey-export.mjs';
 const $ = id => document.getElementById(id);
 // Reusing the same phone tab for the next QR must replace the previously displayed records.
 window.addEventListener('hashchange', () => location.reload());
 try {
+  const {decodeJourney, formatDate, visitRows, buildCsv, exportFilename} = await import('./journey-export.mjs?v=20261106c');
   const data = await decodeJourney(location.hash.slice(1));
   document.title = `${data.title} · 도착노트 여행 기록`;
   $('title').textContent = data.title;

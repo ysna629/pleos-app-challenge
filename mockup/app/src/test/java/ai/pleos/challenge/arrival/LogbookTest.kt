@@ -40,6 +40,22 @@ class LogbookTest {
 }
 
 class CommandsTest {
+    @Test fun familySharingVoiceCommandsStaySeparateFromBusinessLogbook() {
+        assertEquals("SHOW_JOURNEY_QR", Commands.parseIntent("여행 기록 휴대폰으로 보여 줘").name)
+        assertEquals("SHOW_JOURNEY_QR", Commands.parseIntent("큐알 보여줘").name)
+        assertEquals("EXPORT_JOURNEY_CSV", Commands.parseIntent("여행 기록 엑셀로 내보내 줘").name)
+        assertEquals("SAVE_PLACE", Commands.parseIntent("여기 기억해 줘").name)
+    }
+
+    /** STT often drops the first word, and a driver reacting to a view will not recite a fixed phrase. */
+    @Test fun savePlaceSurvivesDroppedFirstWordAndCasualPhrases() {
+        assertEquals(Intent.SAVE_PLACE, Commands.parseIntent("기억해 줘"))
+        assertEquals(Intent.SAVE_PLACE, Commands.parseIntent("여기 찜해 줘"))
+        assertEquals(Intent.SAVE_PLACE, Commands.parseIntent("어 여기 괜찮은데"))
+        assertEquals(Intent.UNKNOWN, Commands.parseIntent("괜찮아"))
+        assertEquals(Intent.UNKNOWN, Commands.parseIntent("찜닭 먹고 싶어"))
+    }
+
     @Test
     fun intent() {
         assertEquals(Intent.LOGBOOK, Commands.parseIntent("운행일지 정리해줘"))
@@ -49,6 +65,9 @@ class CommandsTest {
         assertEquals(Intent.WHERE_PARKED, Commands.parseIntent("주차 위치 알려줘"))
         assertEquals(Intent.UNKNOWN, Commands.parseIntent("노래 틀어줘"))
         assertEquals(Intent.UNKNOWN, Commands.parseIntent(""))
+        assertEquals(Intent.JOURNEY, Commands.parseIntent("여행 기록 보여줘"))
+        assertEquals(Intent.JOURNEY, Commands.parseIntent("나들이 지도"))
+        assertEquals(Intent.SAVE_PLACE, Commands.parseIntent("여기 저장해 줘"))
     }
 
     @Test

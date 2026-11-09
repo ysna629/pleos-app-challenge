@@ -72,3 +72,13 @@ test('Kakao links use address search without GPS and omit unlocatable visits', a
   stop[4] = stop[5] = '';
   assert.equal(kakaoMapLink(stop), null);
 });
+
+test('app links carry the saved coordinates directly without a web/store redirect', async () => {
+  const {kakaoAppLink} = await import('./journey-export.mjs');
+  assert.equal(typeof kakaoAppLink, 'function');
+  assert.equal(kakaoAppLink(fixture().stops[0]), 'kakaomap://look?p=37.45,-127.14');
+  const stop = [...fixture().stops[0]]; stop[2] = stop[3] = null;
+  assert.equal(kakaoAppLink(stop), `kakaomap://search?q=${encodeURIComponent('서울 숲길 "식당"')}`);
+  stop[4] = stop[5] = '';
+  assert.equal(kakaoAppLink(stop), null);
+});

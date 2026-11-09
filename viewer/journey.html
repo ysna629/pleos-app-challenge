@@ -20,11 +20,11 @@
 <p class="muted">기록은 QR 링크 안에 담겨 있으며 서버에 업로드하지 않아요. 이 페이지에는 방문 기록만 포함하며 전체 이동 경로는 포함하지 않아요. 공유한 링크는 차량의 동의 철회로 지워지지 않아요.</p>
 </div></main>
 <script type="module">
-import {decodeJourney,formatDate,kakaoMapLink} from './journey-export.mjs';
 const $=id=>document.getElementById(id);
 const node=(tag,text,cls)=>{const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;return el};
 window.addEventListener('hashchange',()=>location.reload());
 try{
+ const {decodeJourney,formatDate,kakaoMapLink,kakaoAppLink}=await import('./journey-export.mjs?v=20261106c');
  const data=await decodeJourney(location.hash.slice(1));
  $('title').textContent=data.title;document.title=`${data.title} · 도착노트`;
  $('status').textContent=`${formatDate(data.startedAt,data.zone)}부터 · ${data.endedAt===null?'기록 중':formatDate(data.endedAt,data.zone)+'까지'}`;
@@ -41,7 +41,12 @@ try{
   card.append(node('p',`${formatDate(arrive,data.zone)}\n${duration}`,'muted'));
   if(note)card.append(node('p',note,'note'));
   const url=kakaoMapLink(stop);
-  if(url){const a=node('a',lat!==null?'카카오맵에서 주차 위치 보기':'카카오맵에서 장소 검색','map');a.href=url;a.target='_blank';a.rel='noopener noreferrer';card.append(a)}
+  if(url){
+   const app=node('a',lat!==null?'카카오맵 앱에서 위치 보기':'카카오맵 앱에서 장소 검색','map');app.href=kakaoAppLink(stop);card.append(app);
+   const a=node('a','카카오맵 웹으로 보기','muted');a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.style.display='block';a.style.marginTop='12px';card.append(a);
+   if(lat!==null)card.append(node('p',`저장 좌표: ${lat}, ${lng}`,'muted'));
+   card.append(node('p','앱 버튼은 설치된 카카오맵으로 직접 연결해요. 열리지 않으면 일반 브라우저에서 시도하거나 웹으로 보기를 이용해 주세요.','muted'));
+  }
   else card.append(node('p','위치 정보가 없어 지도에 표시할 수 없어요.','muted'));
   $('visits').append(card);
  }

@@ -88,3 +88,11 @@ export function kakaoMapLink(stop) {
   const query = [address, name].filter(Boolean).join(' ').trim();
   return query ? `https://map.kakao.com/link/search/${encodeURIComponent(query)}` : null;
 }
+
+/** Explicit user-initiated app opening keeps coordinates attached to the action. */
+export function kakaoAppLink(stop) {
+  const web = kakaoMapLink(stop);
+  if (!web) return null;
+  if (web.includes('/link/map/')) return `kakaomap://look?p=${stop[2]},${stop[3]}`;
+  return `kakaomap://search?q=${web.split('/link/search/')[1]}`;
+}
