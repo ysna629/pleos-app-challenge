@@ -44,7 +44,7 @@ smoketest/   Pleos SDK 동작 검증용 앱 (호출 결과를 logcat SMOKE 태�
 
 ## 가족 나들이 · 여행 기록 목업
 
-기존 **도착노트 앱 안의 `여행 기록` 탭**에서 이용합니다. 별도 앱을 설치하지 않습니다.
+기존 **도착노트 앱 안의 `여행` 탭**에서 이용합니다. 별도 앱을 설치하지 않습니다.
 
 사용 흐름, QR·엑셀 분리, 음성 기능의 현재 상태와 검증 범위는 [가족 경유지 기록 기능 설명](docs/FAMILY-JOURNEY.md)을 참고하세요.
 
@@ -109,7 +109,7 @@ adb shell am start --user 10 -n ai.pleos.challenge.arrival/.MainActivity --ez jo
 
 | 파일 | 역할 |
 |---|---|
-| `MainActivity.kt` | 화면(홈, 운행일지 정리, 운행기록부)과 음성 대화 흐름 |
+| `MainActivity.kt` | 화면(오늘 요약, 운행일지 정리, 주차 위치 기록, 운행일지 탭)과 음성 대화 흐름 |
 | `CarSignals.kt` | 기어·누적 거리·내비 주소 수신 |
 | `Logbook.kt` | 운행 구간 저장과 합치기 |
 | `Voice.kt` | TTS·STT |

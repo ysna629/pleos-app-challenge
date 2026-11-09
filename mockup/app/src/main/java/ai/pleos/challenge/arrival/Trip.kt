@@ -81,6 +81,51 @@ data class Trip(
     }
 }
 
+/** A parking spot saved on its own, for a drive the driver does not want in the logbook. */
+data class ParkingNote(
+    val savedAt: Long,
+    val spot: String,
+    val address: String = "",
+    val lat: Double? = null,
+    val lng: Double? = null,
+) {
+    fun mapLink(map: MapApp = MapApp.GOOGLE): String? {
+        if (lat == null || lng == null) return null
+        return map.link(String.format(Locale.US, "%.5f", lat), String.format(Locale.US, "%.5f", lng))
+    }
+
+    /** Same shape as [Trip.smsBody] without the distance, which only a logbook trip has. */
+    fun smsBody(map: MapApp = MapApp.GOOGLE): String {
+        val place = address.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
+        val time = SimpleDateFormat("M/d HH:mm", Locale.KOREA).format(Date(savedAt))
+        val link = mapLink(map)?.let { "\n$it" } ?: ""
+        return "[도착노트] $spot$place\n$time 주차$link"
+    }
+
+    fun smsQrText(phone: String, map: MapApp = MapApp.GOOGLE): String = "SMSTO:${phone.filter(Char::isDigit)}:${smsBody(map)}"
+
+    fun toJson(): JSONObject = JSONObject()
+        .put("savedAt", savedAt).put("spot", spot).put("address", address)
+        .put("lat", lat ?: JSONObject.NULL).put("lng", lng ?: JSONObject.NULL)
+
+    companion object {
+        fun fromJson(o: JSONObject) = ParkingNote(
+            savedAt = o.getLong("savedAt"),
+            spot = o.optString("spot"),
+            address = o.optString("address"),
+            lat = if (o.isNull("lat")) null else o.getDouble("lat"),
+            lng = if (o.isNull("lng")) null else o.getDouble("lng"),
+        )
+
+        /** Every spot, newest first, whether it was saved with a logbook trip or on its own. */
+        fun all(trips: List<Trip>, notes: List<ParkingNote>): List<ParkingNote> =
+            (trips.filter { it.parking.isNotBlank() }.map { ParkingNote(it.endedAt, it.parking, it.endAddress, it.endLat, it.endLng) } + notes)
+                .sortedByDescending { it.savedAt }
+
+        fun latest(trips: List<Trip>, notes: List<ParkingNote>): ParkingNote? = all(trips, notes).firstOrNull()
+    }
+}
+
 /** Usage categories of the NTS business-vehicle logbook (업무용승용차 운행기록부). */
 enum class Purpose(val label: String, val short: String, val code: Char) {
     COMMUTE("출퇴근", "출퇴근", 'C'),
@@ -117,6 +162,15 @@ class TripStore(context: Context) {
         prefs.edit().putString("items", JSONArray(trips.map { it.toJson() }).toString()).apply()
     }
 
+    fun loadParking(): List<ParkingNote> {
+        val array = JSONArray(prefs.getString("parking", "[]"))
+        return (0 until array.length()).map { ParkingNote.fromJson(array.getJSONObject(it)) }
+    }
+
+    fun saveParking(notes: List<ParkingNote>) {
+        prefs.edit().putString("parking", JSONArray(notes.map { it.toJson() }).toString()).apply()
+    }
+
     /** The user's own number; the QR addresses the SMS to it so it lands in their inbox. */
     var phone: String
         get() = prefs.getString("phone", "").orEmpty()
@@ -126,6 +180,6 @@ class TripStore(context: Context) {
         get() = runCatching { MapApp.valueOf(prefs.getString("map", "").orEmpty()) }.getOrDefault(MapApp.GOOGLE)
         set(value) = prefs.edit().putString("map", value.name).apply()
 
-    /** Deletes trips, segments and the phone number (consent withdrawn). Segments share this file. */
+    /** Deletes trips, parking notes, segments and the phone number (consent withdrawn). Segments share this file. */
     fun clearAll() = prefs.edit().clear().apply()
 }
