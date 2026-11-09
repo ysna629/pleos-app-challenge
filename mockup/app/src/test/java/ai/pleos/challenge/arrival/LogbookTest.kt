@@ -47,6 +47,15 @@ class CommandsTest {
         assertEquals("SAVE_PLACE", Commands.parseIntent("여기 기억해 줘").name)
     }
 
+    /** STT often drops the first word, and a driver reacting to a view will not recite a fixed phrase. */
+    @Test fun savePlaceSurvivesDroppedFirstWordAndCasualPhrases() {
+        assertEquals(Intent.SAVE_PLACE, Commands.parseIntent("기억해 줘"))
+        assertEquals(Intent.SAVE_PLACE, Commands.parseIntent("여기 찜해 줘"))
+        assertEquals(Intent.SAVE_PLACE, Commands.parseIntent("어 여기 괜찮은데"))
+        assertEquals(Intent.UNKNOWN, Commands.parseIntent("괜찮아"))
+        assertEquals(Intent.UNKNOWN, Commands.parseIntent("찜닭 먹고 싶어"))
+    }
+
     @Test
     fun intent() {
         assertEquals(Intent.LOGBOOK, Commands.parseIntent("운행일지 정리해줘"))

@@ -79,4 +79,60 @@ class JourneyTest {
             .onGear(false, 10_000, null).recordLocation(point)
         assertNull(departed.stops.single().point)
     }
+
+    @Test fun passingPlaceSavesCurrentPositionAsFavoriteWithoutParking() {
+        val driving = Journey("family", "나들이", 1_000).onGear(false, 2_000, null)
+        val saved = driving.savePassingPlace(50_000, fix(49_000))
+        val stop = saved.stops.single()
+        assertEquals(fix(49_000), stop.point)
+        assertEquals(50_000L, stop.arrivedAt)
+        assertEquals(50_000L, stop.departedAt)
+        assertTrue(stop.favorite)
+        assertTrue(stop.passedBy)
+        assertEquals("지나가다 찜한 곳", stop.name)
+        assertEquals(false, saved.lastParked)
+    }
+
+    /** In a tunnel the driver's intent is still worth keeping; the time locates it on the route. */
+    @Test fun passingPlaceWithoutFreshPositionStillKeepsTheMoment() {
+        val saved = Journey("family", "나들이", 1_000).onGear(false, 2_000, null).savePassingPlace(200_000, fix(1_000))
+        assertNull(saved.stops.single().point)
+        assertEquals(200_000L, saved.stops.single().arrivedAt)
+    }
+
+    /** A bump or a double tap must not create two places. */
+    @Test fun repeatedRequestWithinTenSecondsKeepsOnePlace() {
+        val first = Journey("family", "나들이", 1_000).onGear(false, 2_000, null).savePassingPlace(50_000, fix(49_000))
+        assertEquals(1, first.savePassingPlace(59_999, fix(59_000)).stops.size)
+        assertEquals(2, first.savePassingPlace(60_000, fix(59_000)).stops.size)
+    }
+
+    @Test fun recentParkedStopDoesNotBlockAPassingPlace() {
+        val saved = Journey("family", "나들이", 1_000).onGear(true, 44_000, fix(43_000)).onGear(false, 45_000, fix(44_000))
+            .savePassingPlace(50_000, fix(49_000))
+        assertEquals(2, saved.stops.size)
+    }
+
+    @Test fun passingPlaceDoesNotDisturbLaterParkingOrRestart() {
+        val saved = Journey("family", "나들이", 1_000).onGear(false, 2_000, null).savePassingPlace(50_000, fix(49_000))
+        val parked = saved.onGear(true, 100_000, fix(99_000))
+        assertEquals(2, parked.stops.size)
+        assertNull(parked.stops.last().departedAt)
+        val later = parked.onGear(false, 200_000, null).resume()
+        assertEquals(50_000L, later.stops.first().departedAt)
+        assertFalse(later.stops.first().interrupted)
+        assertFalse(later.stops.last().passedBy)
+    }
+
+    /** A restart closes an open visit at its arrival time, which must not look like a place saved from the road. */
+    @Test fun interruptedVisitIsNotAPassingPlace() {
+        val interrupted = Journey("family", "나들이", 1_000).onGear(true, 2_000, null).resume().stops.single()
+        assertEquals(interrupted.arrivedAt, interrupted.departedAt)
+        assertFalse(interrupted.passedBy)
+    }
+
+    @Test fun finishedJourneyTakesNoPassingPlace() {
+        val finished = Journey("family", "나들이", 1_000).finish(2_000)
+        assertEquals(finished, finished.savePassingPlace(3_000, fix(3_000)))
+    }
 }

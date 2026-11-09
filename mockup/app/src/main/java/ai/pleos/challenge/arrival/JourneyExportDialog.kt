@@ -57,3 +57,34 @@ fun JourneyExportDialog(
         dismissButton = { if (csv) TextButton(onClick = onDismiss) { Text("닫기") } },
     )
 }
+
+/** One stop's map link as a QR: the phone opens the map itself, with no hosted page. */
+@Composable
+fun StopMapDialog(stop: JourneyStop, sample: Boolean, app: StopMapApp, onAppChange: (StopMapApp) -> Unit, onDismiss: () -> Unit) {
+    val link = stop.mapQrLink(app)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("휴대폰 지도로 열기") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stop.name.ifBlank { stop.address.ifBlank { "이 방문의 위치" } }, fontSize = 18.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StopMapApp.entries.forEach { option ->
+                        FilterChip(selected = option == app, onClick = { onAppChange(option) }, label = { Text(option.label) })
+                    }
+                }
+                Text(if (app == StopMapApp.GOOGLE) "카메라로 찍으면 구글맵이 열려요. 앱이 없으면 브라우저에서 열려요." else "카메라로 찍으면 ${app.label} 앱이 바로 열려요. 앱이 설치되어 있어야 해요.")
+                val bitmap = remember(link) { link?.let { runCatching { qrBitmap(it, 800).asImageBitmap() } } }?.getOrNull()
+                if (bitmap != null) {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Image(bitmap, contentDescription = "지도 열기 QR", modifier = Modifier.size(320.dp))
+                    }
+                } else Text("QR을 만들지 못했어요.")
+                if (sample) Text("가상의 예시 데이터예요. 지도는 예시 좌표를 표시합니다.")
+                Text(if (stop.point?.valid == true) "저장된 주차 좌표를 열어요. 실제 장소의 입구와 다를 수 있어요." else "GPS 좌표가 없어 기록된 주소로 검색해요.", fontSize = 13.sp)
+                Text("QR을 열면 이 위치가 선택한 지도 서비스에 전달돼요. 별표와 메모는 담기지 않아요.", fontSize = 13.sp)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("닫기") } },
+    )
+}

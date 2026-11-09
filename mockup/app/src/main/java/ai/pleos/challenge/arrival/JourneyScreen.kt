@@ -46,6 +46,7 @@ fun JourneyScreen(
     viewerBase: String, exportMessage: String,
     onSaveCsv: (JourneyExport.Snapshot) -> Unit,
     onOpenExport: () -> Unit, busy: Boolean,
+    stopMapApp: StopMapApp, onStopMapAppChange: (StopMapApp) -> Unit,
 ) {
     var sample by remember { mutableStateOf(sampleJourney()) }
     var selectedJourney by remember { mutableStateOf<String?>(null) }
@@ -142,7 +143,7 @@ fun JourneyScreen(
                                 Text("${index + 1}", color = JourneyAccent, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(30.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(s.name.ifBlank { s.address.ifBlank { "어디에 들르셨나요?" } }, color = Color.White, fontSize = 18.sp)
-                                    Text("${clock(s.arrivedAt)} · ${if (s.interrupted) "기록 중단" else if (s.departedAt == null && journey.endedAt == null) "머무는 중" else "${s.durationMs(s.departedAt ?: s.arrivedAt) / 60_000}분 머묾"}", color = JourneyMuted, fontSize = 14.sp)
+                                    Text("${clock(s.arrivedAt)} · ${if (s.passedBy) "지나가며 저장" else if (s.interrupted) "기록 중단" else if (s.departedAt == null && journey.endedAt == null) "머무는 중" else "${s.durationMs(s.departedAt ?: s.arrivedAt) / 60_000}분 머묾"}", color = JourneyMuted, fontSize = 14.sp)
                                 }
                                 Text(if (s.favorite) "★" else "○", color = if (s.favorite) JourneyGold else JourneyMuted, fontSize = 22.sp)
                             }
@@ -154,8 +155,8 @@ fun JourneyScreen(
                     if (stop != null) {
                         HorizontalDivider(Modifier.padding(vertical = 12.dp), color = Color(0xFF344450))
                         StopDetails(
-                            stop, preview, canEdit, recording, partial, feedback,
-                            onUpdate = { change -> if (canEdit) { if (preview) sample = sample.updateStop(stop.id, change) else onUpdate(journey.id, stop.id, change) } },
+                            stop, preview, canEdit, recording, partial, feedback, stopMapApp, onStopMapAppChange,
+                            onUpdate ={ change -> if (canEdit) { if (preview) sample = sample.updateStop(stop.id, change) else onUpdate(journey.id, stop.id, change) } },
                             onVoice = { if (canEdit) { if (preview) sample = sample.updateStop(stop.id) { it.copy(note = "아이도 좋아했어요. 다음 나들이에 또 오기!") } else onVoiceNote(journey.id, stop.id) } },
                             modifier = Modifier.weight(1.2f),
                         )
@@ -173,7 +174,8 @@ fun JourneyScreen(
 @Composable
 private fun StopDetails(
     stop: JourneyStop, preview: Boolean, canEdit: Boolean, recording: Boolean, partial: String, feedback: String,
-    onUpdate: ((JourneyStop) -> JourneyStop) -> Unit, onVoice: () -> Unit, modifier: Modifier,
+    mapApp: StopMapApp, onMapAppChange: (StopMapApp) -> Unit,
+    onUpdate:((JourneyStop) -> JourneyStop) -> Unit, onVoice: () -> Unit, modifier: Modifier,
 ) {
     var category by remember(stop.id) { mutableStateOf("FD6") }
     var request by remember(stop.id) { mutableIntStateOf(0) }
@@ -182,6 +184,8 @@ private fun StopDetails(
     var message by remember(stop.id) { mutableStateOf("") }
     var manual by remember(stop.id) { mutableStateOf(false) }
     var note by remember(stop.id, stop.note) { mutableStateOf(stop.note) }
+    var mapQr by remember(stop.id) { mutableStateOf(false) }
+    LaunchedEffect(canEdit) { if (!canEdit) mapQr = false }
 
     LaunchedEffect(stop.id, request) {
         if (request == 0) return@LaunchedEffect
@@ -217,6 +221,9 @@ private fun StopDetails(
             Button(onClick = onVoice, enabled = canEdit) { Text(if (preview) "예시 음성 메모" else "음성 메모", fontSize = 17.sp) }
             OutlinedButton(onClick = { manual = !manual }, enabled = canEdit) { Text("메모 수정", fontSize = 17.sp) }
         }
+        if (stop.mapQrLink(mapApp) != null) {
+            OutlinedButton(onClick = { mapQr = true }, enabled = canEdit) { Text("휴대폰 지도로 열기", fontSize = 17.sp) }
+        }
         if (recording) Text("듣고 있어요… $partial", color = JourneyAccent, fontSize = 17.sp)
         if (!preview && feedback.isNotBlank()) Text(feedback, color = JourneyMuted, fontSize = 15.sp)
         if (manual) {
@@ -243,6 +250,7 @@ private fun StopDetails(
             }
         }
     }
+    if (mapQr && canEdit) StopMapDialog(stop, preview, mapApp, onMapAppChange) { mapQr = false }
 }
 
 @Composable

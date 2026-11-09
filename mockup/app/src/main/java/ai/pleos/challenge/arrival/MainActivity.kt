@@ -124,6 +124,10 @@ class MainActivity : ComponentActivity() {
     private var collectionGeneration = 0
     private var journeyShareRequest by mutableStateOf<JourneyShareMode?>(null)
     private var journeyPreview by mutableStateOf(false)
+    private var stopMapApp by mutableStateOf(StopMapApp.KAKAO)
+    private var drivingRestricted by mutableStateOf(false)
+    private var drivingStatus by mutableStateOf("")
+    private lateinit var drivingRestriction: DrivingRestriction
     private var journeyNoteTarget: Pair<String, String>? = null
     private var journeyFeedback by mutableStateOf("")
     private val journeys = mutableStateListOf<Journey>()
@@ -182,10 +186,17 @@ class MainActivity : ComponentActivity() {
         consentStore = ConsentStore(this)
         journeyStore = JourneyStore(this)
         journeys.addAll(journeyStore.load().map { it.resume() })
+        stopMapApp = journeyStore.stopMapApp
         journeyPreview = intent.getBooleanExtra("journey_demo", false)
         if (journeyPreview) screen = Screen.JOURNEY
         consented = consentStore.granted
         if (consented) startCollecting()
+
+        drivingRestriction = DrivingRestriction(applicationContext) { value ->
+            Log.i(TAG, "driving restricted=$value")
+            runOnUiThread { drivingRestricted = value }
+        }
+        drivingRestriction.start()
 
         setContent { App() }
     }
@@ -282,6 +293,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        drivingRestriction.stop()
         stopCollecting()
         super.onDestroy()
     }
@@ -291,6 +303,7 @@ class MainActivity : ComponentActivity() {
     private fun onGearChanged(isParked: Boolean?) {
         val wasParked = parked
         parked = isParked
+        if (wasParked != isParked) drivingStatus = ""
         if (isParked != true) {
             pendingJourneyExport = null
             journeyShareRequest = null
@@ -371,6 +384,26 @@ class MainActivity : ComponentActivity() {
             journeys.addAll(updated)
             journeyStore.save(journeys)
         }
+    }
+
+    /** The driver noticed a place on the road: keep where the car is now and confirm by voice, without stopping. */
+    private fun savePassingPlace() {
+        if (!running || !consented) return
+        if (listening) voice.stopListening()
+        val index = journeys.indexOfFirst { it.endedAt == null }
+        if (index < 0) {
+            drivingStatus = "아직 기록이 시작되지 않았어요."
+            say(Step.IDLE, drivingStatus)
+            return
+        }
+        val updated = journeys[index].savePassingPlace(System.currentTimeMillis(), car.journeyFix)
+        if (updated != journeys[index]) {
+            journeys[index] = updated
+            journeyStore.save(journeys)
+            requestJourneyAddress()
+        }
+        drivingStatus = if (updated.stops.last().point != null) "저장했어요." else "위치는 못 잡았지만 시각을 저장했어요."
+        say(Step.IDLE, drivingStatus)
     }
 
     private fun requestJourneyAddress() {
@@ -538,7 +571,8 @@ class MainActivity : ComponentActivity() {
                 Commands.Intent.SAVE_PLACE -> {
                     val journey = journeys.firstOrNull { it.endedAt == null }
                     val stop = journey?.stops?.lastOrNull()
-                    if (journeyPreview) say(Step.IDLE, "예시 화면이에요. 실제 경유지를 저장하려면 예시 여행 보기를 꺼 주세요.")
+                    if (showsDrivingScreen(drivingRestricted, parked)) savePassingPlace()
+                    else if (journeyPreview) say(Step.IDLE, "예시 화면이에요. 실제 경유지를 저장하려면 예시 여행 보기를 꺼 주세요.")
                     else if (parked == true && journey != null && stop != null) {
                         updateJourneyStop(journey.id, stop.id) { it.copy(favorite = true) }
                         step = Step.IDLE
@@ -547,7 +581,7 @@ class MainActivity : ComponentActivity() {
                     } else say(Step.IDLE, "정차한 뒤 현재 경유지를 저장해 주세요.")
                 }
                 Commands.Intent.UNKNOWN -> {
-                    reply = "여기 기억해 줘, 휴대폰으로 보여 줘, 엑셀로 내보내 줘라고 말씀해 주세요."
+                    reply = if (showsDrivingScreen(drivingRestricted, parked)) "여기 기억해 줘라고 말씀해 주세요." else "여기 기억해 줘, 휴대폰으로 보여 줘, 엑셀로 내보내 줘라고 말씀해 주세요."
                     say(Step.IDLE, reply)
                 }
             }
@@ -712,6 +746,10 @@ class MainActivity : ComponentActivity() {
     private fun App() {
         MaterialTheme(colorScheme = darkColorScheme(primary = Accent, background = Ink, surface = Panel)) {
             Surface(modifier = Modifier.fillMaxSize(), color = Ink) {
+                if (showsDrivingScreen(drivingRestricted, parked)) {
+                    DrivingScreen(consented, listening, partial, drivingStatus, onSave = ::savePassingPlace, onSpeak = ::callAssistant)
+                    return@Surface
+                }
                 if (!consented) {
                     ConsentScreen()
                     return@Surface
@@ -734,6 +772,7 @@ class MainActivity : ComponentActivity() {
                                 viewerBase = intent.getStringExtra("viewer_url") ?: LogbookLink.BASE_URL,
                                 exportMessage = exportMessage, onSaveCsv = ::saveJourneyCsv,
                                 onOpenExport = { exportMessage = "" }, busy = step != Step.IDLE,
+                                stopMapApp = stopMapApp, onStopMapAppChange = { stopMapApp = it; journeyStore.stopMapApp = it },
                             )
                         }
                     }

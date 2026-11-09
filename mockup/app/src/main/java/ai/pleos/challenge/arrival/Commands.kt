@@ -9,7 +9,7 @@ object Commands {
         return when {
             listOf("엑셀", "CSV", "csv", "씨에스브이").any(text::contains) -> Intent.EXPORT_JOURNEY_CSV
             listOf("휴대폰", "핸드폰", "큐알", "QR", "qr").any(text::contains) -> Intent.SHOW_JOURNEY_QR
-            listOf("여기저장", "이곳저장", "장소저장", "여기기억", "여기를기억", "이곳기억").any(text::contains) -> Intent.SAVE_PLACE
+            listOf("여기저장", "이곳저장", "장소저장", "여기기억", "여기를기억", "이곳기억", "기억해", "찜해", "괜찮은데").any(text::contains) -> Intent.SAVE_PLACE
             listOf("여행기록", "여행지도", "나들이", "여행보여").any(text::contains) -> Intent.JOURNEY
             listOf("어디주차", "주차어디", "주차위치", "차어디", "어디세웠", "어디댔").any(text::contains) -> Intent.WHERE_PARKED
             listOf("운행일지", "운행기록", "일지", "정리", "기록").any(text::contains) -> Intent.LOGBOOK

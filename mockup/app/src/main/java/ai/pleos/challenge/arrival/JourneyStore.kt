@@ -15,6 +15,11 @@ class JourneyStore(context: Context) {
     fun save(journeys: List<Journey>) {
         prefs.edit().putString("journeys", JSONArray(journeys.map(::journeyToJson)).toString()).apply()
     }
+
+    /** The map a stop's QR opens; remembered so the driver chooses once. */
+    var stopMapApp: StopMapApp
+        get() = runCatching { StopMapApp.valueOf(prefs.getString("stopMap", "").orEmpty()) }.getOrDefault(StopMapApp.KAKAO)
+        set(value) = prefs.edit().putString("stopMap", value.name).apply()
 }
 
 private fun pointJson(point: JourneyPoint): JSONArray = JSONArray(listOf(point.latitude, point.longitude, point.at, point.breakBefore))

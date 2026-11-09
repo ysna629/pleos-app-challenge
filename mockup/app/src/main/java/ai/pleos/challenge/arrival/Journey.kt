@@ -25,7 +25,13 @@ data class JourneyStop(
     val address: String = "",
 ) {
     fun durationMs(now: Long): Long = ((departedAt ?: now) - arrivedAt).coerceAtLeast(0)
+
+    /** Saved from the road without stopping, so it has no stay. */
+    val passedBy: Boolean get() = departedAt == arrivedAt && !interrupted
 }
+
+private const val PASSING_PLACE_NAME = "지나가다 찜한 곳"
+private const val PASSING_PLACE_REPEAT_MS = 10_000L
 
 data class Journey(
     val id: String,
@@ -57,6 +63,16 @@ data class Journey(
             stops + JourneyStop("$id-$at", at, fix?.takeIf { it.isFresh(at) })
         } else stops.map { if (it.departedAt == null && !it.interrupted) it.copy(departedAt = at) else it }
         return copy(stops = updated, lastParked = parked)
+    }
+
+    /**
+     * A place the driver noticed on the road. Closed at once, so later parking and restarts leave it alone.
+     * The position is where the car was when asked, not the place itself; nearby search narrows it down later.
+     */
+    fun savePassingPlace(at: Long, fix: JourneyPoint?): Journey {
+        if (endedAt != null) return this
+        if (stops.any { it.passedBy && at - it.arrivedAt in 0 until PASSING_PLACE_REPEAT_MS }) return this
+        return copy(stops = stops + JourneyStop("$id-pass-$at", at, fix?.takeIf { it.isFresh(at) }, at, PASSING_PLACE_NAME, favorite = true))
     }
 
     /** We cannot know where the car went while this activity was absent. */
