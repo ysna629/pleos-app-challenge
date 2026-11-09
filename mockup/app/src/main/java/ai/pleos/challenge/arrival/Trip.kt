@@ -135,11 +135,16 @@ enum class Purpose(val label: String, val short: String, val code: Char) {
 
 /** Map apps whose web links open on both iPhone and Android, from an SMS or a camera scan. */
 enum class MapApp(val label: String) {
-    GOOGLE("구글 지도") {
-        override fun link(lat: String, lng: String) = "https://www.google.com/maps/search/?api=1&query=$lat,$lng"
-    },
     KAKAO("카카오맵") {
         override fun link(lat: String, lng: String) = "https://map.kakao.com/link/map/${URLEncoder.encode("주차", "UTF-8")},$lat,$lng"
+    },
+    // The SMS needs an https link to be tappable, so not the nmap:// scheme the journey QR uses.
+    NAVER("네이버 지도") {
+        override fun link(lat: String, lng: String) =
+            "https://m.map.naver.com/map.naver?lat=$lat&lng=$lng&pinTitle=${URLEncoder.encode("주차", "UTF-8")}&pinType=site&dlevel=11"
+    },
+    GOOGLE("구글 지도") {
+        override fun link(lat: String, lng: String) = "https://www.google.com/maps/search/?api=1&query=$lat,$lng"
     };
 
     abstract fun link(lat: String, lng: String): String

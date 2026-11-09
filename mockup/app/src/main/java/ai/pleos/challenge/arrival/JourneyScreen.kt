@@ -71,10 +71,10 @@ fun JourneyScreen(
                 Text("여행 기록", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 Text("우연히 들른 곳도, 다시 찾고 싶은 곳으로.", color = JourneyMuted, fontSize = 17.sp)
             }
+            FilterChip(selected = preview, onClick = { onPreviewChange(!preview) }, label = { Text(if (preview) "예시 여행 보는 중" else "예시 여행 보기") })
             OutlinedButton(onClick = { journey?.let { onOpenExport(); mode = JourneyShareMode.VIEW; export = JourneyExport.snapshot(it, preview) } }, enabled = canEdit && journey != null) {
                 Text("휴대폰으로 보기", fontSize = 17.sp)
             }
-            FilterChip(selected = preview, onClick = { onPreviewChange(!preview) }, label = { Text(if (preview) "예시 여행 보는 중" else "예시 여행 보기") })
             OutlinedButton(onClick = { journey?.let { onOpenExport(); mode = JourneyShareMode.CSV; export = JourneyExport.snapshot(it, preview) } }, enabled = canEdit && journey != null) {
                 Text("엑셀 내보내기", fontSize = 17.sp)
             }
