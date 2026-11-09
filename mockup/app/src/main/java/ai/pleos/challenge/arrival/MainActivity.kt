@@ -12,13 +12,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,19 +38,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,7 +63,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -153,7 +157,6 @@ class MainActivity : ComponentActivity() {
     /** The spot flow is running on its own ("주차 위치 기록해줘"), not as the last step of organizing a trip. */
     private var parkOnly by mutableStateOf(false)
     private var parkAddress by mutableStateOf("")
-    private var showParkingShare by mutableStateOf(false)
     private var exportMessage by mutableStateOf("")
     private var pendingJourneyExport: Pair<JourneyExport.Snapshot, Int>? = null
     private var journeyExportJob: Job? = null
@@ -301,7 +304,6 @@ class MainActivity : ComponentActivity() {
         segments.clear()
         parkingNotes.clear()
         parkOnly = false
-        showParkingShare = false
         journeys.clear()
         journeyNoteTarget = null
         journeyFeedback = ""
@@ -399,8 +401,7 @@ class MainActivity : ComponentActivity() {
         if (!isParked) {
             Notices.cancelArrival(this)
             showBanner = false
-            showParkingShare = false
-            stopLogbookWhileDriving()
+                stopLogbookWhileDriving()
         }
         if (isParked && wasParked != true) requestJourneyAddress()
     }
@@ -724,7 +725,7 @@ class MainActivity : ComponentActivity() {
             }
             Step.HEAR_SPOT_NOTE -> {
                 val note = text.trim().trimEnd('.')
-                if (note.isNotBlank()) setFreeSpot("${ParkingText.OUTDOOR} · $note".take(40))
+                if (note.isNotBlank()) setFreeSpot("${ParkingText.OUTDOOR}, $note".take(40))
                 reviewSpot()
             }
             Step.HEAR_PILLAR -> {
@@ -896,8 +897,12 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun App() {
-        MaterialTheme(colorScheme = darkColorScheme(primary = Accent, background = Ink, surface = Panel)) {
-            Surface(modifier = Modifier.fillMaxSize(), color = Ink) {
+        val colors = darkColorScheme(
+            primary = Ui.Accent, onPrimary = Ui.OnAccent, background = Ui.Bg, onBackground = Ui.Ink,
+            surface = Ui.Panel, onSurface = Ui.Ink, surfaceVariant = Ui.Raised, onSurfaceVariant = Ui.Muted, outline = Ui.Line,
+        )
+        MaterialTheme(colorScheme = colors) {
+            Surface(modifier = Modifier.fillMaxSize(), color = Ui.Bg) {
                 if (showsDrivingScreen(drivingRestricted, parked)) {
                     DrivingScreen(consented, listening, partial, drivingStatus, onSave = ::savePassingPlace, onSpeak = ::callAssistant)
                     return@Surface
@@ -916,7 +921,6 @@ class MainActivity : ComponentActivity() {
                             Screen.RECORDS -> RecordsScreen()
                             Screen.JOURNEY -> JourneyScreen(
                                 journeys = journeys, parked = parked, preview = journeyPreview, onPreviewChange = { journeyPreview = it },
-                                onSpeak = ::callAssistant, listening = listening, voiceStatus = reply,
                                 shareRequest = journeyShareRequest, onShareRequestHandled = { journeyShareRequest = null },
                                 onUpdate = ::updateJourneyStop,
                                 onVoiceNote = ::recordJourneyNote, recording = step == Step.ASK_JOURNEY_NOTE || step == Step.HEAR_JOURNEY_NOTE,
@@ -929,9 +933,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     if (confirmWithdraw) WithdrawBanner() else if (showBanner) ArrivalBanner()
-                    // The journey tab has its own mic in its header, and the organizing flow listens by itself.
-                    if (screen == Screen.HOME || screen == Screen.RECORDS) VoiceBar()
-                    if (showParkingShare) ParkingShareDialog()
+                    // The organizing flow asks and listens by itself; everywhere else the mic is in the same place.
+                    if (screen != Screen.LOGBOOK) VoiceBar()
                 }
             }
         }
@@ -941,30 +944,26 @@ class MainActivity : ComponentActivity() {
     private fun ConsentScreen() {
         Column(
             Modifier.fillMaxSize().padding(48.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            Text("도착노트", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("시작하기 전에 개인정보 수집·이용에 동의해 주세요", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Card(Modifier.fillMaxWidth()) {
-                Label("수집하는 정보와 쓰는 곳")
+            Text("도착노트", fontSize = Ui.Title, fontWeight = FontWeight.Bold, color = Ui.Ink)
+            Heading("시작하기 전에 개인정보 수집·이용에 동의해 주세요")
+            Panel(Modifier.fillMaxWidth()) {
+                Note("수집하는 정보와 쓰는 곳")
                 Consent.items.forEach { item ->
-                    Text(item.title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(top = 12.dp))
-                    Body(item.detail)
+                    Text(item.title, fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+                    Note(item.detail)
                 }
-                Spacer(Modifier.height(16.dp))
-                Label("보관")
-                Body(Consent.STORAGE)
-                Spacer(Modifier.height(16.dp))
-                Label("동의 철회")
-                Body(Consent.WITHDRAW)
+                Rule(Modifier.padding(vertical = 20.dp))
+                Text("보관", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink, modifier = Modifier.padding(bottom = 4.dp))
+                Note(Consent.STORAGE)
+                Text("동의 철회", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+                Note(Consent.WITHDRAW)
             }
-            if (declined) Body("동의하지 않으면 운행 기록과 음성 기능을 쓸 수 없어요. 언제든 다시 동의할 수 있어요.", color = Warn)
+            if (declined) Note("동의하지 않으면 운행 기록과 음성 기능을 쓸 수 없어요. 언제든 다시 동의할 수 있어요.", color = Ui.Warn)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = { agree() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink),
-                ) { Text("동의하고 시작", fontSize = 20.sp) }
-                OutlinedButton(onClick = { declined = true }) { Text("동의하지 않음", fontSize = 20.sp) }
+                PrimaryButton("동의하고 시작") { agree() }
+                QuietButton("동의하지 않음") { declined = true }
             }
         }
     }
@@ -972,31 +971,29 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun WithdrawBanner() {
         Row(
-            Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(12.dp)).padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            Modifier.fillMaxWidth().padding(top = 16.dp).background(Ui.Panel, Ui.Shape).border(1.dp, Ui.Warn, Ui.Shape).padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("동의를 철회하면 수집을 멈추고 저장된 운행 기록·주차 위치·번호를 모두 지워요.", fontSize = 18.sp, color = Warn, modifier = Modifier.weight(1f))
+            Text("동의를 철회하면 수집을 멈추고 저장된 운행 기록, 주차 위치, 번호를 모두 지워요.", fontSize = Ui.Body, color = Ui.Warn, modifier = Modifier.weight(1f))
             Button(
-                onClick = { confirmWithdraw = false; withdrawConsent() },
-                colors = ButtonDefaults.buttonColors(containerColor = Warn, contentColor = Ink),
-            ) { Text("철회하고 지우기", fontSize = 18.sp) }
-            TextButton(onClick = { confirmWithdraw = false }) { Text("취소", fontSize = 18.sp) }
+                onClick = { confirmWithdraw = false; withdrawConsent() }, shape = Ui.ControlShape,
+                colors = ButtonDefaults.buttonColors(containerColor = Ui.Warn, contentColor = Ui.Bg),
+            ) { Text("철회하고 지우기", fontSize = Ui.Body, fontWeight = FontWeight.Bold) }
+            QuietButton("취소") { confirmWithdraw = false }
         }
     }
 
     @Composable
     private fun TopBar() {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("도착노트", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Spacer(Modifier.width(24.dp))
-            GearBadge()
+            Text("도착노트", fontSize = Ui.Title, fontWeight = FontWeight.Bold, color = Ui.Ink)
+            Spacer(Modifier.width(20.dp))
+            GearState()
             Spacer(Modifier.weight(1f))
-            Row(Modifier.background(Panel, RoundedCornerShape(50)).padding(4.dp)) {
-                // Organizing a trip (LOGBOOK) starts from home, so it keeps the home tab lit.
-                Tab("오늘", screen == Screen.HOME || screen == Screen.LOGBOOK) { screen = Screen.HOME }
-                Tab("운행일지", screen == Screen.RECORDS) { screen = Screen.RECORDS }
-                Tab("여행", screen == Screen.JOURNEY) { journeyPreview = false; screen = Screen.JOURNEY }
-            }
+            // Organizing a trip (LOGBOOK) starts from the today tab, so it keeps that tab lit.
+            Tab("오늘", screen == Screen.HOME || screen == Screen.LOGBOOK) { screen = Screen.HOME }
+            Tab("운행일지", screen == Screen.RECORDS) { screen = Screen.RECORDS }
+            Tab("여행", screen == Screen.JOURNEY) { screen = Screen.JOURNEY }
             Spacer(Modifier.width(8.dp))
             SettingsMenu()
         }
@@ -1004,12 +1001,14 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Tab(label: String, selected: Boolean, onClick: () -> Unit) {
-        Text(
-            label, fontSize = 20.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            color = if (selected) Ink else Muted,
-            modifier = Modifier.clip(RoundedCornerShape(50)).background(if (selected) Accent else Color.Transparent)
-                .clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 10.dp),
-        )
+        Column(
+            Modifier.clip(Ui.ControlShape).clickable(onClick = onClick).padding(horizontal = 22.dp, vertical = 8.dp).width(IntrinsicSize.Max),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(label, fontSize = Ui.Heading, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) Ui.Ink else Ui.Muted)
+            Spacer(Modifier.height(6.dp))
+            Box(Modifier.fillMaxWidth().height(4.dp).background(if (selected) Ui.Accent else Color.Transparent, RoundedCornerShape(2.dp)))
+        }
     }
 
     /** Rarely used actions stay out of the tab row; consent withdrawal must still be one tap away from any screen. */
@@ -1017,10 +1016,12 @@ class MainActivity : ComponentActivity() {
     private fun SettingsMenu() {
         var open by remember { mutableStateOf(false) }
         Box {
-            TextButton(onClick = { open = true }) { Text("⚙", fontSize = 26.sp, color = Muted) }
+            IconButton(onClick = { open = true }, modifier = Modifier.size(56.dp)) {
+                Icon(Icons.Filled.Settings, contentDescription = "설정", tint = Ui.Muted, modifier = Modifier.size(34.dp))
+            }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 DropdownMenuItem(
-                    text = { Text("개인정보 동의 철회", fontSize = 20.sp) },
+                    text = { Text("개인정보 동의 철회", fontSize = Ui.Body) },
                     onClick = { open = false; confirmWithdraw = true },
                 )
             }
@@ -1028,199 +1029,149 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun GearBadge() {
+    private fun GearState() {
         val label = when (parked) {
             null -> "기어 확인 중"
-            true -> "P · 주차"
-            false -> "주행 중 · 기록 중"
+            true -> "주차 중"
+            false -> "주행 중"
         }
-        Text(
-            label,
-            fontSize = 18.sp,
-            color = if (parked == false) Ink else Color.White,
-            modifier = Modifier
-                .background(if (parked == false) Accent else Panel, RoundedCornerShape(8.dp))
-                .padding(horizontal = 14.dp, vertical = 6.dp),
-        )
+        Text(label, fontSize = Ui.Small, color = Ui.Muted, modifier = Modifier.background(Ui.Raised, RoundedCornerShape(8.dp)).padding(horizontal = 14.dp, vertical = 6.dp))
     }
 
     /** Quiet prompt after returning to P; ignoring it just leaves the segments for later. */
     @Composable
     private fun ArrivalBanner() {
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp).background(Line, RoundedCornerShape(12.dp)).padding(horizontal = 24.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp).background(Ui.Raised, Ui.Shape).padding(horizontal = 24.dp, vertical = 14.dp),
         ) {
-            Text("운행일지 정리할까요?", fontSize = 22.sp, color = Color.White, modifier = Modifier.weight(1f))
-            Button(
-                onClick = { startLogbook() },
-                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink),
-            ) { Text("🎤 정리하기", fontSize = 20.sp) }
-            Spacer(Modifier.width(12.dp))
-            TextButton(onClick = { showBanner = false }) { Text("닫기", fontSize = 20.sp) }
+            Text("운행일지를 정리할까요?", fontSize = Ui.Heading, fontWeight = FontWeight.Bold, color = Ui.Ink, modifier = Modifier.weight(1f))
+            PrimaryButton("정리하기") { startLogbook() }
+            QuietButton("닫기") { showBanner = false }
         }
     }
 
-    /** The three things the app keeps, each with its current figure and one way in. */
+    /** What the car has kept, one row per kind, and the latest parking spot ready to send to the phone. */
     @Composable
     private fun HomeScreen() {
-        Row(
-            Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            val pending = Logbook.merge(segments)
-            val month = LogbookLink.tripsIn(trips, java.time.YearMonth.now())
-            val sum = LogbookLink.summary(month)
-            SummaryCard(
-                title = "운행일지", hint = "주행 거리를 자동으로 기록해요",
-                caption = when {
-                    pending != null -> "정리 안 한 운행 ${segments.count { it.isClosed }}구간"
-                    segments.any { !it.isClosed } -> "지금"
-                    else -> "이번 달 운행"
-                },
-                value = when {
-                    pending != null -> km(pending.distanceKm)
-                    segments.any { !it.isClosed } -> "기록 중"
-                    else -> "${month.size}건"
-                },
-                details = listOf(
-                    if (month.isEmpty()) "이번 달 기록이 아직 없어요" else "이번 달 ${month.size}건 · ${km(sum.totalKm)}",
-                    if (month.isEmpty()) "기어를 D로 바꾸면 기록을 시작해요" else String.format(Locale.KOREA, "업무사용비율 %.0f%%", sum.ratio),
-                    "계기판 ${odometer?.let(::km) ?: "읽는 중"}",
-                ),
-                recentTitle = "최근 운행",
-                recent = trips.take(3).map { "${shortDate(it.endedAt)} · ${km(it.distanceKm)} · ${it.purpose.short}" },
-            ) {
-                if (pending != null) PrimaryButton("정리하기", enabled = step == Step.IDLE && parked == true) { startLogbook() }
-                else OutlinedButton(onClick = { screen = Screen.RECORDS }) { Text("기록부 보기", fontSize = 20.sp) }
-            }
-            val spots = ParkingNote.all(trips, parkingNotes)
-            val last = spots.firstOrNull()
-            SummaryCard(
-                title = "주차 위치", hint = "말 한마디로 층·기둥을 남겨요",
-                caption = "마지막 주차",
-                value = last?.spot ?: "아직 없어요",
-                details = if (last == null) listOf("운행일지 없이 주차 위치만", "남길 수도 있어요")
-                else listOf(formatDate(last.savedAt), last.address.ifBlank { "주소 없음" }),
-                recentTitle = "이전 주차",
-                recent = spots.drop(1).take(3).map { "${shortDate(it.savedAt)} · ${it.spot}" },
-            ) {
-                PrimaryButton("기록하기", enabled = step == Step.IDLE && parked == true) { startParkOnly() }
-                if (last != null) TextButton(onClick = { showParkingShare = true }) { Text("문자로 받기", fontSize = 20.sp) }
-            }
-            val journey = journeys.firstOrNull { it.endedAt == null }
-            SummaryCard(
-                title = "여행", hint = "들른 곳을 자동으로 모아요",
-                caption = "오늘 들른 곳",
-                value = "${journey?.stops?.size ?: 0}곳",
-                details = listOf(
-                    String.format(Locale.KOREA, "이동 %.1f km", journey?.distanceKm ?: 0.0),
-                    "다시 갈 곳 ${journey?.stops?.count { it.favorite } ?: 0}곳",
-                ),
-                recentTitle = "오늘의 발자취",
-                recent = journey?.stops.orEmpty().takeLast(3).reversed().map {
-                    "${SimpleDateFormat("HH:mm", Locale.KOREA).format(Date(it.arrivedAt))} · ${it.name.ifBlank { it.address.ifBlank { "이름 없는 곳" } }}${if (it.favorite) " ★" else ""}"
-                },
-            ) {
-                OutlinedButton(onClick = { journeyPreview = false; screen = Screen.JOURNEY }) { Text("여행 보기", fontSize = 20.sp) }
-            }
-        }
-    }
-
-    @OptIn(ExperimentalLayoutApi::class)
-    @Composable
-    private fun RowScope.SummaryCard(
-        title: String, hint: String, caption: String, value: String, details: List<String>,
-        recentTitle: String, recent: List<String>,
-        actions: @Composable () -> Unit,
-    ) {
-        Column(Modifier.weight(1f).fillMaxHeight().background(Panel, RoundedCornerShape(16.dp)).padding(24.dp)) {
-            Text(title, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Accent)
-            Text(hint, fontSize = 18.sp, color = Muted)
-            Spacer(Modifier.height(28.dp))
-            Text(caption, fontSize = 18.sp, color = Muted)
-            Text(value, fontSize = 42.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2)
-            Spacer(Modifier.height(8.dp))
-            details.forEach { Text(it, fontSize = 20.sp, color = Muted, modifier = Modifier.padding(top = 2.dp)) }
-            if (recent.isNotEmpty()) {
-                Spacer(Modifier.height(24.dp))
-                HorizontalDivider(color = Line)
-                Spacer(Modifier.height(16.dp))
-                Text(recentTitle, fontSize = 17.sp, color = Muted)
-                recent.forEach {
-                    Text(it, fontSize = 19.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+        val last = ParkingNote.latest(trips, parkingNotes)
+        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
+            Panel(Modifier.weight(1f).fillMaxHeight()) {
+                val pending = Logbook.merge(segments)
+                val recording = segments.any { !it.isClosed }
+                val month = LogbookLink.tripsIn(trips, java.time.YearMonth.now())
+                val sum = LogbookLink.summary(month)
+                SummaryRow(
+                    title = "운행일지",
+                    value = when {
+                        pending != null -> km(pending.distanceKm)
+                        recording -> "기록 중"
+                        else -> "${month.size}건"
+                    },
+                    caption = when {
+                        pending != null -> "정리하지 않은 운행"
+                        recording -> "지금 운행"
+                        else -> "이번 달 운행"
+                    },
+                    details = listOfNotNull(
+                        if (month.isEmpty()) "이번 달 기록이 아직 없어요" else "이번 달 ${month.size}건, ${km(sum.totalKm)}",
+                        String.format(Locale.KOREA, "업무사용비율 %.0f%%", sum.ratio).takeIf { month.isNotEmpty() },
+                        "계기판 ${odometer?.let(::km) ?: "읽는 중"}",
+                    ),
+                ) {
+                    if (pending != null) PrimaryButton("정리하기", enabled = step == Step.IDLE && parked == true) { startLogbook() }
+                    else QuietButton("기록 보기") { screen = Screen.RECORDS }
+                }
+                Rule()
+                SummaryRow(
+                    title = "주차 위치",
+                    value = last?.spot ?: "기록 없음",
+                    caption = if (last == null) "" else "마지막 주차",
+                    details = if (last == null) listOf("운행일지와 따로 주차 위치만 남길 수 있어요")
+                    else listOfNotNull(formatDate(last.savedAt), last.address.takeIf { it.isNotBlank() }),
+                ) {
+                    QuietButton("기록하기", enabled = step == Step.IDLE && parked == true) { startParkOnly() }
+                }
+                Rule()
+                val journey = journeys.firstOrNull { it.endedAt == null }
+                SummaryRow(
+                    title = "여행",
+                    value = "${journey?.stops?.size ?: 0}곳",
+                    caption = "오늘 들른 곳",
+                    details = listOf(
+                        String.format(Locale.KOREA, "이동 %.1f km", journey?.distanceKm ?: 0.0),
+                        "다시 갈 곳 ${journey?.stops?.count { it.favorite } ?: 0}곳",
+                    ),
+                ) {
+                    QuietButton("여행 보기") { journeyPreview = false; screen = Screen.JOURNEY }
                 }
             }
-            Spacer(Modifier.weight(1f))
-            Spacer(Modifier.height(20.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.Center) { actions() }
+            SharePanel(listOf("마지막 주차 위치 문자"), 0, {}) {
+                SmsShare(
+                    qr = last?.smsQrText(phone, mapApp), body = last?.smsBody(mapApp), hasLink = last?.mapLink() != null,
+                    empty = "주차 위치를 기록하면 QR이 나타나요.",
+                )
+            }
         }
     }
 
+    /** One kind of record: its name, the current figure, a few facts, and the one thing to do next. */
     @Composable
-    private fun PrimaryButton(label: String, enabled: Boolean = true, onClick: () -> Unit) {
-        Button(onClick = onClick, enabled = enabled, colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink)) {
-            Text(label, fontSize = 20.sp)
+    private fun ColumnScope.SummaryRow(
+        title: String, value: String, caption: String, details: List<String>, action: @Composable () -> Unit,
+    ) {
+        Row(Modifier.weight(1f).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Heading(title, Modifier.width(170.dp))
+            Column(Modifier.weight(1.1f)) {
+                Text(value, fontSize = Ui.Value, fontWeight = FontWeight.Bold, color = Ui.Ink, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 56.sp)
+                if (caption.isNotBlank()) Note(caption)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                details.forEach { Text(it, fontSize = Ui.Body, color = Ui.Muted, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+            }
+            Box(Modifier.width(170.dp), contentAlignment = Alignment.CenterEnd) { action() }
         }
     }
 
-    /** The app is used by calling it, so the mic stays under every tab instead of living on one screen. */
+    /** The mic is how the app is used, so it sits under every tab with the phrases that work there. */
     @Composable
     private fun VoiceBar() {
         Row(
-            Modifier.fillMaxWidth().padding(top = 16.dp).background(Panel, RoundedCornerShape(16.dp)).padding(horizontal = 24.dp, vertical = 16.dp),
+            Modifier.fillMaxWidth().padding(top = 16.dp).background(Ui.Panel, Ui.Shape).padding(horizontal = 24.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Button(
-                onClick = { callAssistant() },
-                enabled = step == Step.IDLE,
-                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink),
-                modifier = Modifier.size(width = 190.dp, height = 80.dp),
-            ) { Text("🎤 말하기", fontSize = 26.sp, fontWeight = FontWeight.Bold) }
-            Spacer(Modifier.width(24.dp))
+            MicButton("말하기", enabled = step == Step.IDLE) { callAssistant() }
+            Spacer(Modifier.width(28.dp))
             Column(Modifier.weight(1f)) {
                 when {
-                    step == Step.HEAR_COMMAND -> Text(partial.ifBlank { "듣고 있어요…" }, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    reply.isNotBlank() -> Text(reply, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    else -> {
-                        Text("이렇게 불러 보세요", fontSize = 17.sp, color = Muted)
-                        Text("\"운행일지 정리해줘\" · \"주차 위치 기록해줘\" · \"주차 어디 했지?\" · \"여기 기억해 줘\"", fontSize = 20.sp, color = Color.White)
-                    }
+                    step == Step.HEAR_COMMAND -> Heading(partial.ifBlank { "듣고 있어요" })
+                    reply.isNotBlank() -> Heading(reply)
+                    screen == Screen.JOURNEY -> Text("\"여기 기억해 줘\"   \"휴대폰으로 보여 줘\"   \"엑셀로 내보내 줘\"", fontSize = Ui.Body, color = Ui.Muted)
+                    else -> Text("\"운행일지 정리해줘\"   \"주차 위치 기록해줘\"   \"주차 어디 했지?\"", fontSize = Ui.Body, color = Ui.Muted)
                 }
-                if (heard.isNotBlank() && step != Step.HEAR_COMMAND) Text("들은 말: \"$heard\"", fontSize = 17.sp, color = Muted)
-                if (notice.isNotBlank() && step == Step.HEAR_COMMAND) Text(notice, fontSize = 17.sp, color = Warn)
+                if (heard.isNotBlank() && step != Step.HEAR_COMMAND) Note("들은 말: \"$heard\"")
+                if (notice.isNotBlank() && step == Step.HEAR_COMMAND) Note(notice, color = Ui.Warn)
             }
         }
     }
 
-    /** SMS QR for the latest spot. Spots saved without a trip have no row in the logbook table to share from. */
+    /** An SMS to the driver's own number as a QR, with the text it will send. [qr] and [body] are null with nothing to send. */
     @Composable
-    private fun ParkingShareDialog() {
-        val last = ParkingNote.latest(trips, parkingNotes) ?: return
-        AlertDialog(
-            onDismissRequest = { showParkingShare = false },
-            confirmButton = { TextButton(onClick = { showParkingShare = false }) { Text("닫기", fontSize = 20.sp) } },
-            title = { Text("주차 위치 문자로 받기", fontSize = 24.sp, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    PhoneField()
-                    Spacer(Modifier.height(12.dp))
-                    if (phone.count(Char::isDigit) < 10) Body("내 번호를 입력하면 QR로 문자를 보낼 수 있어요.")
-                    else Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Image(qrBitmap(last.smsQrText(phone, mapApp)).asImageBitmap(), contentDescription = "문자 보내기 QR 코드", modifier = Modifier.size(220.dp))
-                    }
-                    if (last.mapLink() != null) {
-                        Spacer(Modifier.height(12.dp))
-                        MapChips()
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        last.smsBody(mapApp), fontSize = 17.sp, color = Color.White,
-                        modifier = Modifier.fillMaxWidth().background(Line, RoundedCornerShape(8.dp)).padding(12.dp),
-                    )
-                }
-            },
+    private fun SmsShare(qr: String?, body: String?, hasLink: Boolean, empty: String) {
+        PhoneField()
+        val ready = phone.count(Char::isDigit) >= 10
+        QrPlate(
+            qr.takeIf { ready }, "문자 보내기 QR 코드",
+            empty = if (body == null) empty else "내 번호를 입력하면 QR이 나타나요.",
         )
+        if (body != null) {
+            Note("카메라로 스캔하면 문자 앱이 열려요. 보내면 내 문자함에 남아요.")
+            if (hasLink) Segmented(MapApp.entries.map { it.label }, MapApp.entries.indexOf(mapApp)) {
+                mapApp = MapApp.entries[it]
+                store.mapApp = mapApp
+            }
+            Text(body, fontSize = Ui.Small, color = Ui.Ink, lineHeight = 28.sp, modifier = Modifier.fillMaxWidth().background(Ui.Raised, Ui.ControlShape).padding(16.dp))
+        }
     }
 
     @Composable
@@ -1235,59 +1186,37 @@ class MainActivity : ComponentActivity() {
             // Typing is for a parked car only (driver distraction guideline).
             enabled = parked == true,
             singleLine = true,
+            textStyle = TextStyle(fontSize = Ui.Body),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             modifier = Modifier.fillMaxWidth(),
         )
     }
 
     @Composable
-    private fun MapChips() {
-        Label("지도 링크")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MapApp.entries.forEach { app ->
-                FilterChip(
-                    selected = mapApp == app,
-                    onClick = { mapApp = app; store.mapApp = app },
-                    label = { Text(app.label, fontSize = 18.sp) },
-                )
-            }
-        }
-    }
-
-    @Composable
     private fun LogbookScreen() {
         if (parkOnly) return ParkOnlyScreen()
         val trip = draft ?: return HomeScreen()
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            Card(Modifier.weight(0.8f)) {
-                Label("정리할 운행")
-                Big("총 ${km(trip.distanceKm)}")
+        Row(horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
+            Panel(Modifier.weight(0.8f)) {
+                Heading("정리할 운행")
+                Text("총 ${km(trip.distanceKm)}", fontSize = Ui.Value, fontWeight = FontWeight.Bold, color = Ui.Ink)
                 Spacer(Modifier.height(12.dp))
-                Body("${formatDate(trip.startedAt)} 출발 · ${trip.startAddress.ifBlank { "주소 없음" }}")
-                Body("${formatDate(trip.endedAt)} 도착 · ${trip.endAddress.ifBlank { "주소 없음" }}")
-                Body("${km(trip.startKm)}  →  ${km(trip.endKm)}")
-                Spacer(Modifier.height(20.dp))
-                Label("운행 구분")
+                Fact("출발", "${formatDate(trip.startedAt)}  ${trip.startAddress.ifBlank { "주소 없음" }}")
+                Fact("도착", "${formatDate(trip.endedAt)}  ${trip.endAddress.ifBlank { "주소 없음" }}")
+                Fact("계기판", "${km(trip.startKm)} → ${km(trip.endKm)}")
+                Spacer(Modifier.height(24.dp))
+                Note("운행 구분")
+                Spacer(Modifier.height(8.dp))
                 val purposeOpen = step in setOf(Step.ASK_PURPOSE, Step.HEAR_PURPOSE, Step.CHOOSE_PURPOSE)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Purpose.entries.forEach { purpose ->
-                        FilterChip(
-                            selected = !purposeOpen && trip.purpose == purpose,
-                            enabled = purposeOpen,
-                            onClick = { savePurpose(purpose) },
-                            label = { Text(purpose.label, fontSize = 18.sp) },
-                        )
-                    }
-                }
+                Segmented(
+                    Purpose.entries.map { it.label }, if (purposeOpen) -1 else Purpose.entries.indexOf(trip.purpose), enabled = purposeOpen,
+                ) { savePurpose(Purpose.entries[it]) }
             }
-            AssistantCard {
+            AssistantPanel {
                 when (step) {
                     Step.ASK_PARK, Step.HEAR_PARK, Step.CHOOSE_PARK -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(
-                            onClick = { listenToken++; voice.stopListening(); askFloor() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink),
-                        ) { Text("주차 위치 기록", fontSize = 20.sp) }
-                        OutlinedButton(onClick = { finishLogbook("알겠어요. 운행일지만 저장했어요.") }) { Text("안 할게요", fontSize = 20.sp) }
+                        PrimaryButton("주차 위치 기록") { listenToken++; voice.stopListening(); askFloor() }
+                        QuietButton("안 할게요") { finishLogbook("알겠어요. 운행일지만 저장했어요.") }
                     }
                     Step.ASK_FLOOR, Step.HEAR_FLOOR, Step.ASK_PILLAR, Step.HEAR_PILLAR, Step.ASK_SPOT_NOTE, Step.HEAR_SPOT_NOTE,
                     Step.ASK_CONFIRM, Step.HEAR_CONFIRM, Step.REVIEW_SPOT -> SpotPicker()
@@ -1299,30 +1228,37 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun ParkOnlyScreen() {
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            Card(Modifier.weight(0.8f)) {
-                Label("주차 위치만 기록")
-                Big(parkAddress.ifBlank { "지금 주차한 곳" })
+        Row(horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
+            Panel(Modifier.weight(0.8f)) {
+                Heading("주차 위치만 기록")
                 Spacer(Modifier.height(12.dp))
-                Body(formatDate(System.currentTimeMillis()))
-                Body(if (car.lastFix != null) "문자에 지도 링크를 함께 넣어요." else "GPS 좌표가 없어 지도 링크는 빠져요.")
-                Spacer(Modifier.height(20.dp))
-                Body("운행일지는 그대로 둬요. 나중에 \"운행일지 정리해줘\"로 따로 정리할 수 있어요.")
+                Fact("위치", parkAddress.ifBlank { "지금 주차한 곳" })
+                Fact("시각", formatDate(System.currentTimeMillis()))
+                Fact("지도", if (car.lastFix != null) "문자에 지도 링크를 넣어요" else "GPS 좌표가 없어 지도 링크는 빠져요")
+                Spacer(Modifier.height(24.dp))
+                Note("운행일지는 그대로 둬요. 나중에 \"운행일지 정리해줘\"로 따로 정리할 수 있어요.")
             }
-            AssistantCard { SpotPicker() }
+            AssistantPanel { SpotPicker() }
+        }
+    }
+
+    @Composable
+    private fun Fact(name: String, value: String) {
+        Row(Modifier.padding(top = 8.dp)) {
+            Text(name, fontSize = Ui.Body, color = Ui.Muted, modifier = Modifier.width(90.dp))
+            Text(value, fontSize = Ui.Body, color = Ui.Ink)
         }
     }
 
     /** The current question, what was heard, and the controls that answer it by touch. */
     @Composable
-    private fun RowScope.AssistantCard(content: @Composable () -> Unit) {
-        Card(Modifier.weight(1.4f).verticalScroll(rememberScrollState())) {
-            Label("도착노트")
-            Text(question, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            if (listening) Body("듣고 있어요… ${partial}", color = Accent)
-            else if (heard.isNotBlank()) Body("들은 말: \"$heard\"")
-            if (notice.isNotBlank()) Body(notice, color = Warn)
-            Spacer(Modifier.height(16.dp))
+    private fun RowScope.AssistantPanel(content: @Composable () -> Unit) {
+        Panel(Modifier.weight(1.4f).verticalScroll(rememberScrollState())) {
+            Text(question, fontSize = Ui.Title, fontWeight = FontWeight.Bold, color = Ui.Ink, lineHeight = 44.sp)
+            if (listening) Note("듣고 있어요  $partial", color = Ui.Accent, modifier = Modifier.padding(top = 8.dp))
+            else if (heard.isNotBlank()) Note("들은 말: \"$heard\"", modifier = Modifier.padding(top = 8.dp))
+            if (notice.isNotBlank()) Note(notice, color = Ui.Warn)
+            Spacer(Modifier.height(20.dp))
             content()
         }
     }
@@ -1331,18 +1267,18 @@ class MainActivity : ComponentActivity() {
     private fun SpotPicker() {
         val spot = parkingText()
         val reviewing = step in setOf(Step.ASK_CONFIRM, Step.HEAR_CONFIRM, Step.REVIEW_SPOT)
-        Big(spot.ifBlank { "주차 위치" })
-        Spacer(Modifier.height(12.dp))
-        Label("층이 없는 곳")
+        Text(spot.ifBlank { "주차 위치" }, fontSize = Ui.Value, fontWeight = FontWeight.Bold, color = if (spot.isBlank()) Ui.Muted else Ui.Ink)
+        Spacer(Modifier.height(16.dp))
+        Note("층이 없는 곳")
         val presets = listOf(ParkingText.TOWER, ParkingText.OUTDOOR)
-        Picker(presets, presets.indexOfFirst { manualSpot.startsWith(it) }) { setFreeSpot(presets[it]); onSpotEdited() }
-        Label("층")
+        Keys(presets, presets.indexOfFirst { manualSpot.startsWith(it) }) { setFreeSpot(presets[it]); onSpotEdited() }
+        Note("층")
         // Picking a floor or pillar goes back to the structured spot, so drop any free text.
-        Picker(FLOORS.map { if (it < 0) "B${-it}" else "${it}F" }, FLOORS.indexOf(floor)) { manualSpot = ""; floor = FLOORS[it]; onSpotEdited() }
-        Label("기둥 번호  ${pillarCode.ifBlank { "—" }}")
+        Keys(FLOORS.map { if (it < 0) "B${-it}" else "${it}F" }, FLOORS.indexOf(floor)) { manualSpot = ""; floor = FLOORS[it]; onSpotEdited() }
+        Note(if (pillarCode.isBlank()) "기둥 번호" else "기둥 번호 $pillarCode")
         // Each tap appends, so codes such as AL02 or B-15 can be built; leading zeros are kept.
-        Picker(LETTERS.map(Char::toString), -1) { manualSpot = ""; pillarCode = (pillarCode + LETTERS[it]).take(8); onSpotEdited() }
-        Picker((1..9).map(Int::toString) + "0" + "-" + "⌫" + "전체 지우기", -1) { index ->
+        Keys(LETTERS.map(Char::toString), -1) { manualSpot = ""; pillarCode = (pillarCode + LETTERS[it]).take(8); onSpotEdited() }
+        Keys((1..9).map(Int::toString) + "0" + "-" + "지우기" + "전체 지우기", -1) { index ->
             Log.i(TAG, "pillar key $index (was $pillarCode)")
             pillarCode = when (index) {
                 9 -> (pillarCode + "0").take(8)
@@ -1353,42 +1289,40 @@ class MainActivity : ComponentActivity() {
             }
             onSpotEdited()
         }
-        TextButton(onClick = { showManual = !showManual }) { Text(if (showManual) "직접 입력 닫기" else "직접 입력", fontSize = 20.sp) }
         if (showManual) {
             OutlinedTextField(
                 value = manualSpot,
                 onValueChange = { manualSpot = it.take(40); onSpotEdited() },
                 label = { Text("주차 위치 직접 입력 (예: 주차타워 3번, 정문 옆 편의점 앞)") },
                 singleLine = true,
+                textStyle = TextStyle(fontSize = Ui.Body),
                 modifier = Modifier.fillMaxWidth(),
             )
+            Spacer(Modifier.height(12.dp))
         }
-        Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
-                onClick = { saveSpot(spot) },
-                enabled = reviewing && spot.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink),
-            ) { Text("저장", fontSize = 20.sp) }
-            OutlinedButton(onClick = { askFloor() }, enabled = reviewing) { Text("다시 묻기", fontSize = 20.sp) }
-            TextButton(onClick = { skipSpot() }) { Text(if (parkOnly) "취소" else "건너뛰기", fontSize = 20.sp) }
+            PrimaryButton("저장", enabled = reviewing && spot.isNotBlank()) { saveSpot(spot) }
+            QuietButton("다시 묻기", enabled = reviewing) { askFloor() }
+            QuietButton(if (showManual) "직접 입력 닫기" else "직접 입력") { showManual = !showManual }
+            QuietButton(if (parkOnly) "취소" else "건너뛰기") { skipSpot() }
         }
     }
 
-    /** A wrapping row of chips; tapping one reports its index. */
+    /** A wrapping row of keys; tapping one reports its index. */
     @OptIn(ExperimentalLayoutApi::class)
     @Composable
-    private fun Picker(labels: List<String>, selected: Int, onPick: (Int) -> Unit) {
+    private fun Keys(labels: List<String>, selected: Int, onPick: (Int) -> Unit) {
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
         ) {
             labels.forEachIndexed { index, label ->
-                FilterChip(
-                    selected = index == selected,
-                    onClick = { onPick(index) },
-                    label = { Text(label, fontSize = 20.sp, modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)) },
-                )
+                val on = index == selected
+                Box(
+                    Modifier.clip(RoundedCornerShape(8.dp)).background(if (on) Ui.Accent else Ui.Raised).clickable { onPick(index) }
+                        .defaultMinSize(minWidth = 56.dp, minHeight = 52.dp).padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) { Text(label, fontSize = Ui.Body, color = if (on) Ui.OnAccent else Ui.Ink, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal) }
             }
         }
     }
@@ -1396,47 +1330,46 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun RecordsScreen() {
         var selected by remember { mutableStateOf(0) }
-        var monthly by remember { mutableStateOf(false) }
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            Card(Modifier.weight(1.6f)) {
-                Label("업무용승용차 운행기록부")
-                Row(Modifier.padding(vertical = 8.dp)) {
+        var share by remember { mutableStateOf(0) }
+        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
+            Panel(Modifier.weight(1f).fillMaxHeight()) {
+                Heading("업무용승용차 운행기록부")
+                Row(Modifier.padding(top = 12.dp)) {
                     Cell("사용일자", 1.3f, header = true)
                     Cell("주행 전", 1f, header = true)
                     Cell("주행 후", 1f, header = true)
-                    Cell("주행거리", 0.9f, header = true)
+                    Cell("주행거리", 0.8f, header = true)
                     Cell("구분", 0.8f, header = true)
-                    Cell("주차 위치", 1.2f, header = true)
+                    Cell("주차 위치", 1.3f, header = true)
                 }
-                HorizontalDivider(color = Line)
-                if (trips.isEmpty()) Body("아직 기록이 없어요.")
+                Rule()
+                if (trips.isEmpty()) Note("아직 기록이 없어요. 주행을 마치고 \"운행일지 정리해줘\"라고 말해 보세요.", modifier = Modifier.padding(top = 20.dp))
                 LazyColumn {
                     items(trips.size) { index ->
                         val trip = trips[index]
                         Row(
-                            Modifier
-                                .background(if (index == selected) Line else Color.Transparent)
-                                .padding(vertical = 10.dp),
+                            Modifier.clip(RoundedCornerShape(8.dp)).background(if (index == selected) Ui.Raised else Color.Transparent)
+                                .clickable { selected = index; share = 0 },
                         ) {
-                            TextButton(onClick = { selected = index }, modifier = Modifier.weight(1.3f)) {
-                                Text(formatDate(trip.endedAt), fontSize = 17.sp, color = Color.White, modifier = Modifier.fillMaxWidth())
-                            }
+                            Cell(formatDate(trip.endedAt), 1.3f)
                             Cell(km(trip.startKm), 1f)
                             Cell(km(trip.endKm), 1f)
-                            Cell(km(trip.distanceKm), 0.9f)
+                            Cell(km(trip.distanceKm), 0.8f)
                             Cell(trip.purpose.label, 0.8f)
-                            Cell(trip.parking.ifBlank { "-" }, 1.2f)
+                            Cell(trip.parking.ifBlank { "-" }, 1.3f)
                         }
                     }
                 }
             }
-            Card(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                Label("휴대폰으로 받기")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 12.dp)) {
-                    FilterChip(selected = !monthly, onClick = { monthly = false }, label = { Text("이번 운행 · 문자", fontSize = 18.sp) })
-                    FilterChip(selected = monthly, onClick = { monthly = true }, label = { Text("월간 운행기록부", fontSize = 18.sp) })
+            SharePanel(listOf("운행 문자", "월간 운행기록부"), share, { share = it }) {
+                if (share == 1) MonthlyShare()
+                else {
+                    val trip = trips.getOrNull(selected)
+                    SmsShare(
+                        qr = trip?.smsQrText(phone, mapApp), body = trip?.smsBody(mapApp), hasLink = trip?.mapLink() != null,
+                        empty = "기록이 생기면 QR이 나타나요.",
+                    )
                 }
-                if (monthly) MonthlyShare() else TripShare(trips.getOrNull(selected))
             }
         }
     }
@@ -1445,85 +1378,42 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun MonthlyShare() {
         val months = LogbookLink.months(trips)
-        if (months.isEmpty()) return Body("기록이 생기면 QR 코드가 나타나요.")
+        if (months.isEmpty()) return QrPlate(null, "월간 운행기록부 QR 코드", empty = "기록이 생기면 QR이 나타나요.")
         var index by remember { mutableStateOf(0) }
         val month = months[index.coerceIn(months.indices)]
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { index++ }, enabled = index < months.lastIndex) { Text("◀", fontSize = 20.sp) }
-            Text("${month.year}년 ${month.monthValue}월", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            TextButton(onClick = { index-- }, enabled = index > 0) { Text("▶", fontSize = 20.sp) }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { index++ }, enabled = index < months.lastIndex, modifier = Modifier.size(52.dp)) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "이전 달", modifier = Modifier.size(36.dp))
+            }
+            Text("${month.year}년 ${month.monthValue}월", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            IconButton(onClick = { index-- }, enabled = index > 0, modifier = Modifier.size(52.dp)) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "다음 달", modifier = Modifier.size(36.dp))
+            }
         }
         val inMonth = LogbookLink.tripsIn(trips, month)
         val sum = LogbookLink.summary(inMonth)
-        Body("${inMonth.size}건 · 총 ${km(sum.totalKm)} · 업무용 ${km(sum.workKm)}", color = Color.White)
-        Body(String.format(Locale.KOREA, "업무사용비율 %.1f%%", sum.ratio), color = Accent)
-        Spacer(Modifier.height(12.dp))
         val url = remember(month, inMonth) {
             // e.g. --es viewer_url http://192.168.0.10:8765/ to try viewer/ from a laptop before it is published
             LogbookLink.url(trips, month, base = intent.getStringExtra("viewer_url") ?: LogbookLink.BASE_URL)
                 .also { Log.i(TAG, "monthly ${it.length} chars $it") }
         }
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Image(qrBitmap(url, 640).asImageBitmap(), contentDescription = "월간 운행기록부 QR 코드", modifier = Modifier.size(300.dp))
-        }
-        Spacer(Modifier.height(12.dp))
-        Body("휴대폰 카메라로 스캔하면 국세청 운행기록부 양식으로 열려요. 엑셀로 받거나 인쇄할 수 있어요.")
-    }
-
-    @Composable
-    private fun TripShare(trip: Trip?) {
-        Column {
-            PhoneField()
-            Spacer(Modifier.height(12.dp))
-            when {
-                trip == null -> Body("기록이 생기면 QR 코드가 나타나요.")
-                phone.count(Char::isDigit) < 10 -> Body("내 번호를 입력하면 QR로 문자를 보낼 수 있어요.")
-                else -> {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Image(qrBitmap(trip.smsQrText(phone, mapApp)).asImageBitmap(), contentDescription = "문자 보내기 QR 코드", modifier = Modifier.size(240.dp))
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Body("휴대폰 카메라로 스캔하면 문자 앱이 열려요. 보내면 내 문자함에 저장돼요.")
-                }
-            }
-            if (trip?.mapLink() != null) {
-                Spacer(Modifier.height(12.dp))
-                MapChips()
-            }
-            if (trip != null) {
-                Spacer(Modifier.height(12.dp))
-                Label("보낼 문자")
-                Text(
-                    trip.smsBody(mapApp),
-                    fontSize = 17.sp,
-                    color = Color.White,
-                    modifier = Modifier.fillMaxWidth().background(Line, RoundedCornerShape(8.dp)).padding(12.dp),
-                )
-            }
+        QrPlate(url, "월간 운행기록부 QR 코드", empty = "QR을 만들지 못했어요.")
+        Note("카메라로 스캔하면 국세청 운행기록부 양식으로 열려요. 엑셀로 받거나 인쇄할 수 있어요.")
+        Column(Modifier.fillMaxWidth().background(Ui.Raised, Ui.ControlShape).padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("${inMonth.size}건, 총 ${km(sum.totalKm)}", fontSize = Ui.Small, color = Ui.Ink)
+            Text("업무용 ${km(sum.workKm)}", fontSize = Ui.Small, color = Ui.Ink)
+            Text(String.format(Locale.KOREA, "업무사용비율 %.1f%%", sum.ratio), fontSize = Ui.Small, fontWeight = FontWeight.Bold, color = Ui.Ink)
         }
     }
-
-    @Composable
-    private fun Card(modifier: Modifier, content: @Composable () -> Unit) {
-        Column(modifier.background(Panel, RoundedCornerShape(16.dp)).padding(28.dp)) { content() }
-    }
-
-    @Composable
-    private fun Label(text: String) = Text(text, fontSize = 18.sp, color = Muted, modifier = Modifier.padding(bottom = 8.dp))
-
-    @Composable
-    private fun Big(text: String) = Text(text, fontSize = 40.sp, fontWeight = FontWeight.Bold, color = Color.White)
-
-    @Composable
-    private fun Body(text: String, color: Color = Muted) = Text(text, fontSize = 20.sp, color = color, modifier = Modifier.padding(top = 4.dp))
 
     @Composable
     private fun RowScope.Cell(text: String, weight: Float, header: Boolean = false) = Text(
         text,
-        fontSize = 17.sp,
-        color = if (header) Muted else Color.White,
+        fontSize = if (header) Ui.Small else 22.sp,
+        color = if (header) Ui.Muted else Ui.Ink,
         textAlign = TextAlign.Start,
-        modifier = Modifier.weight(weight).padding(horizontal = 8.dp, vertical = 12.dp),
+        maxLines = 1, overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.weight(weight).padding(horizontal = 10.dp, vertical = if (header) 12.dp else 18.dp),
     )
 
     private companion object {
@@ -1540,13 +1430,6 @@ class MainActivity : ComponentActivity() {
             "cmd_logbook.pcm", "purpose.pcm", "yes.pcm", "floor.pcm", "pillar.pcm", "yes.pcm",
             "cmd_where.pcm", "cmd_logbook.pcm",
         )
-
-        val Ink = Color(0xFF0F1419)
-        val Panel = Color(0xFF1A222C)
-        val Line = Color(0xFF2A3542)
-        val Muted = Color(0xFF9AA7B6)
-        val Accent = Color(0xFF5EC8B8)
-        val Warn = Color(0xFFF0B45C)
 
         /** "12,340킬로미터" reads better through TTS than "12,340.0km". */
         fun spokenKm(value: Float) = String.format(Locale.KOREA, "%,d킬로미터", value.toInt())

@@ -18,13 +18,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -69,17 +71,27 @@ fun DrivingScreen(consented: Boolean, listening: Boolean, heard: String, status:
         verticalArrangement = Arrangement.Center,
     ) {
         if (!consented) {
-            Text("정차한 뒤 개인정보 동의를 진행해 주세요.", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center)
+            Text("정차한 뒤 개인정보 동의를 진행해 주세요.", fontSize = 40.sp, fontWeight = FontWeight.Bold, color = Ui.Ink, textAlign = TextAlign.Center)
             return@Column
         }
         Text(
             if (listening) heard.ifBlank { "듣고 있어요…" } else status.ifBlank { "마음에 드는 곳을 지나면 저장하세요." },
-            fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center,
+            fontSize = 40.sp, fontWeight = FontWeight.Bold, color = Ui.Ink, textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(48.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-            Button(onClick = onSave, modifier = Modifier.size(width = 420.dp, height = 180.dp)) { Text("★ 여기 저장", fontSize = 44.sp) }
-            OutlinedButton(onClick = onSpeak, enabled = !listening, modifier = Modifier.size(width = 420.dp, height = 180.dp)) { Text("🎤 말하기", fontSize = 44.sp) }
+            Button(
+                onClick = onSave, shape = Ui.Shape, modifier = Modifier.size(width = 420.dp, height = 180.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Ui.Accent, contentColor = Ui.OnAccent),
+            ) { Text("여기 저장", fontSize = 44.sp, fontWeight = FontWeight.Bold) }
+            OutlinedButton(
+                onClick = onSpeak, enabled = !listening, shape = Ui.Shape, modifier = Modifier.size(width = 420.dp, height = 180.dp),
+                border = BorderStroke(2.dp, Ui.Line), colors = ButtonDefaults.outlinedButtonColors(contentColor = Ui.Ink),
+            ) {
+                MicIcon(if (listening) Ui.Muted else Ui.Ink, 52.dp)
+                Spacer(Modifier.width(20.dp))
+                Text("말하기", fontSize = 44.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
