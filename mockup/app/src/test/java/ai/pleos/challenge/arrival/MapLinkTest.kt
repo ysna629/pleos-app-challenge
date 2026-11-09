@@ -22,4 +22,16 @@ class MapLinkTest {
         assertTrue(trip.smsBody(MapApp.KAKAO).contains("map.kakao.com"))
         assertFalse(trip.copy(endLat = null, endLng = null).smsBody().contains("http"))
     }
+
+    @Test
+    fun parkingNote_latestAcrossTripsAndNotes() {
+        val older = ParkingNote(1_000, "지하 2층 B15")
+        val newer = ParkingNote(9_000, "3층 C-3", "판교역로", 37.4501234, 127.1298765)
+        assertEquals("지하 5층 A4", ParkingNote.latest(listOf(trip.copy(endedAt = 5_000)), listOf(older))?.spot)
+        assertEquals(newer, ParkingNote.latest(listOf(trip.copy(endedAt = 5_000)), listOf(newer, older)))
+        assertNull(ParkingNote.latest(listOf(trip.copy(parking = "")), emptyList()))
+        assertTrue(newer.smsBody().startsWith("[도착노트] 3층 C-3 · 판교역로\n"))
+        assertTrue(newer.smsBody().endsWith("주차\nhttps://www.google.com/maps/search/?api=1&query=37.45012,127.12988"))
+        assertFalse(older.smsBody().contains("http"))
+    }
 }
