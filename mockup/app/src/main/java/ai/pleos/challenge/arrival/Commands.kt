@@ -31,6 +31,14 @@ object Commands {
         return null
     }
 
+    /** Answer to "도착하셨나요?": true when parked for good, false for a short stop, null when unclear. */
+    fun parseParked(raw: String): Boolean? {
+        val text = raw.replace(" ", "")
+        if (listOf("잠깐", "잠시", "정차", "금방", "아직").any(text::contains)) return false
+        parseYesNo(raw)?.let { return it }
+        return if (listOf("주차했", "주차함", "주차요", "도착", "세웠", "댔어", "했어", "했습니다").any(text::contains)) true else null
+    }
+
     fun parsePurpose(raw: String): Purpose? {
         val text = raw.replace(" ", "")
         return when {
