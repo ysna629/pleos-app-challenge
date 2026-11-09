@@ -13,6 +13,10 @@ class MapLinkTest {
     fun mapLink_perApp() {
         assertEquals("https://www.google.com/maps/search/?api=1&query=37.45012,127.12988", trip.mapLink())
         assertEquals("https://map.kakao.com/link/map/%EC%A3%BC%EC%B0%A8,37.45012,127.12988", trip.mapLink(MapApp.KAKAO))
+        assertEquals(
+            "https://m.map.naver.com/map.naver?lat=37.45012&lng=127.12988&pinTitle=%EC%A3%BC%EC%B0%A8&pinType=site&dlevel=11",
+            trip.mapLink(MapApp.NAVER),
+        )
         assertNull(trip.copy(endLat = null).mapLink())
     }
 
