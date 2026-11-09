@@ -81,11 +81,50 @@ object ParkingText {
         return floor to parsePillar(afterFloor)
     }
 
+    const val TOWER = "주차타워"
+    const val OUTDOOR = "지상 주차"
+
+    /** "3번 타워에 넣었어" -> "주차타워 3번", "기계식이야" -> "주차타워". Null when no tower is mentioned. */
+    fun towerLabel(raw: String): String? {
+        val text = raw.replace(" ", "")
+        if (!text.contains("타워") && !text.contains("기계식")) return null
+        val unit = Regex("([0-9]{1,2}|[일이삼사오육칠팔구십]{1,3})(번|호기|호)").find(text)
+        val count = unit?.let { number(it.groupValues[1]) }
+        return if (count != null) "$TOWER ${count}번" else TOWER
+    }
+
+    /** Parked in the open, where there is no floor or pillar to name: "지상이야", "야외 주차장", "길가에 댔어". */
+    fun isOutdoor(raw: String): Boolean {
+        val text = raw.replace(" ", "")
+        if (listOf("야외", "노상", "노면", "길가", "길에", "바깥", "밖에", "옥외").any(text::contains)) return true
+        return text.contains("지상") && parseFloor(raw) == null
+    }
+
     fun floorLabel(level: Int) = if (level < 0) "지하 ${-level}층" else "${level}층"
 
     /** Final text stored in the logbook, e.g. "지하 5층 AL02". */
     fun format(floor: Int?, pillar: String?): String =
         listOfNotNull(floor?.let(::floorLabel), pillar?.takeIf { it.isNotBlank() }).joinToString(" ")
+
+    private val letterNames = mapOf(
+        'A' to "에이", 'B' to "비", 'C' to "씨", 'D' to "디", 'E' to "이", 'F' to "에프", 'G' to "지", 'H' to "에이치",
+        'I' to "아이", 'J' to "제이", 'K' to "케이", 'L' to "엘", 'M' to "엠", 'N' to "엔", 'O' to "오", 'P' to "피",
+        'Q' to "큐", 'R' to "알", 'S' to "에스", 'T' to "티", 'U' to "유", 'V' to "브이", 'W' to "더블유", 'X' to "엑스",
+        'Y' to "와이", 'Z' to "제트",
+    )
+    private val spokenDigits = "공일이삼사오육칠팔구"
+    private val codeInText = Regex("([A-Za-z]+)(-?)([0-9]*)")
+
+    /**
+     * Rewrites pillar codes for TTS, which reads "A4로" as an English word: "지하 5층 A4로" -> "지하 5층 에이 4로",
+     * "AL02" -> "에이엘 공이", "C-3" -> "씨 다시 3". The text shown on screen stays as written.
+     */
+    fun spoken(text: String): String = codeInText.replace(text) { match ->
+        val (letters, hyphen, number) = match.destructured
+        val names = letters.uppercase().map(letterNames::getValue).joinToString("")
+        val digits = if (number.startsWith("0")) number.map { spokenDigits[it - '0'] }.joinToString("") else number
+        listOf(names, if (hyphen.isEmpty()) "" else "다시", digits).filter { it.isNotEmpty() }.joinToString(" ")
+    }
 
     private fun code(letters: String, digits: String, hyphen: Boolean) =
         if (hyphen && digits.isNotEmpty()) "$letters-$digits" else letters + digits

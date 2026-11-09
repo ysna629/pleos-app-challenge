@@ -95,7 +95,7 @@ class MainActivity : ComponentActivity() {
         IDLE, HEAR_COMMAND, ASK_JOURNEY_NOTE, HEAR_JOURNEY_NOTE,
         ASK_PURPOSE, HEAR_PURPOSE, CHOOSE_PURPOSE,
         ASK_PARK, HEAR_PARK, CHOOSE_PARK,
-        ASK_FLOOR, HEAR_FLOOR, ASK_PILLAR, HEAR_PILLAR, ASK_CONFIRM, HEAR_CONFIRM, REVIEW_SPOT,
+        ASK_FLOOR, HEAR_FLOOR, ASK_PILLAR, HEAR_PILLAR, ASK_SPOT_NOTE, HEAR_SPOT_NOTE, ASK_CONFIRM, HEAR_CONFIRM, REVIEW_SPOT,
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -483,7 +483,7 @@ class MainActivity : ComponentActivity() {
         step = next
         question = prompt
         val token = ++listenToken
-        voice.speak(prompt)
+        voice.speak(ParkingText.spoken(prompt))
         if (next.name.startsWith("ASK_")) {
             // Fallback only: TTS onDone is sometimes not delivered. Listening early would record our own prompt.
             handler.postDelayed({ if (token == listenToken && step == next) onSpoken() }, 4_000L + prompt.length * 250L)
@@ -501,6 +501,7 @@ class MainActivity : ComponentActivity() {
             Step.ASK_PURPOSE -> listenFor(Step.HEAR_PURPOSE)
             Step.ASK_PARK -> listenFor(Step.HEAR_PARK)
             Step.ASK_FLOOR -> listenFor(Step.HEAR_FLOOR)
+            Step.ASK_SPOT_NOTE -> listenFor(Step.HEAR_SPOT_NOTE)
             Step.ASK_PILLAR -> listenFor(Step.HEAR_PILLAR)
             Step.ASK_CONFIRM -> listenFor(Step.HEAR_CONFIRM)
             Step.ASK_JOURNEY_NOTE -> listenFor(Step.HEAR_JOURNEY_NOTE)
@@ -625,18 +626,31 @@ class MainActivity : ComponentActivity() {
                 false -> finishLogbook("알겠어요. 운행일지만 저장했어요.")
                 null -> say(Step.CHOOSE_PARK, "주차 위치를 기록할지 화면에서 골라 주세요.")
             }
+            // The answer to "어디에 주차하셨나요?": a floor (with or without a pillar), a parking tower,
+            // an open-air spot, or any short description. Not every car park has floors and pillars.
             Step.HEAR_FLOOR -> {
-                floor = ParkingText.parseFloor(text)
+                val tower = ParkingText.towerLabel(text)
+                floor = if (tower == null) ParkingText.parseFloor(text) else null
                 if (floor != null) notice = ""
                 // Some people answer with the whole spot at once ("지하 5층 A4").
                 val pillar = ParkingText.parseSentence(text).second?.takeIf { floor != null }
-                Log.i(TAG, "floor -> $floor, pillar=$pillar")
-                if (pillar != null) {
-                    setPillar(pillar)
-                    reviewSpot()
-                } else {
-                    say(Step.ASK_PILLAR, "기둥 번호를 말씀해 주세요.")
+                Log.i(TAG, "floor -> $floor, pillar=$pillar, tower=$tower")
+                when {
+                    tower != null -> { setFreeSpot(tower); reviewSpot() }
+                    floor != null && pillar != null -> { setPillar(pillar); reviewSpot() }
+                    floor != null -> say(Step.ASK_PILLAR, "기둥 번호를 말씀해 주세요. 없으면 없다고 하셔도 돼요.")
+                    ParkingText.isOutdoor(text) -> {
+                        setFreeSpot(ParkingText.OUTDOOR)
+                        say(Step.ASK_SPOT_NOTE, "근처에 보이는 걸 한마디로 말씀해 주세요.")
+                    }
+                    text.isNotBlank() -> { setFreeSpot(text.trim().trimEnd('.').take(40)); reviewSpot() }
+                    else -> reviewSpot()
                 }
+            }
+            Step.HEAR_SPOT_NOTE -> {
+                val note = text.trim().trimEnd('.')
+                if (note.isNotBlank()) setFreeSpot("${ParkingText.OUTDOOR} · $note".take(40))
+                reviewSpot()
             }
             Step.HEAR_PILLAR -> {
                 val pillar = ParkingText.parsePillar(text)
@@ -714,7 +728,7 @@ class MainActivity : ComponentActivity() {
     private fun askFloor() {
         clearSpot()
         notice = ""
-        say(Step.ASK_FLOOR, "몇 층이에요?")
+        say(Step.ASK_FLOOR, "어디에 주차하셨나요?")
     }
 
     private fun clearSpot() {
@@ -722,6 +736,14 @@ class MainActivity : ComponentActivity() {
         pillarCode = ""
         manualSpot = ""
         showManual = false
+    }
+
+    /** A spot that is not floor + pillar. It goes in the free-text field so it can be fixed by typing. */
+    private fun setFreeSpot(text: String) {
+        floor = null
+        pillarCode = ""
+        manualSpot = text
+        showManual = true
     }
 
     private fun setPillar(code: String) {
@@ -1190,7 +1212,7 @@ class MainActivity : ComponentActivity() {
                         ) { Text("주차 위치 기록", fontSize = 20.sp) }
                         OutlinedButton(onClick = { finishLogbook("알겠어요. 운행일지만 저장했어요.") }) { Text("안 할게요", fontSize = 20.sp) }
                     }
-                    Step.ASK_FLOOR, Step.HEAR_FLOOR, Step.ASK_PILLAR, Step.HEAR_PILLAR,
+                    Step.ASK_FLOOR, Step.HEAR_FLOOR, Step.ASK_PILLAR, Step.HEAR_PILLAR, Step.ASK_SPOT_NOTE, Step.HEAR_SPOT_NOTE,
                     Step.ASK_CONFIRM, Step.HEAR_CONFIRM, Step.REVIEW_SPOT -> SpotPicker()
                     else -> Unit
                 }
@@ -1234,11 +1256,15 @@ class MainActivity : ComponentActivity() {
         val reviewing = step in setOf(Step.ASK_CONFIRM, Step.HEAR_CONFIRM, Step.REVIEW_SPOT)
         Big(spot.ifBlank { "주차 위치" })
         Spacer(Modifier.height(12.dp))
+        Label("층이 없는 곳")
+        val presets = listOf(ParkingText.TOWER, ParkingText.OUTDOOR)
+        Picker(presets, presets.indexOfFirst { manualSpot.startsWith(it) }) { setFreeSpot(presets[it]); onSpotEdited() }
         Label("층")
-        Picker(FLOORS.map { if (it < 0) "B${-it}" else "${it}F" }, FLOORS.indexOf(floor)) { floor = FLOORS[it]; onSpotEdited() }
+        // Picking a floor or pillar goes back to the structured spot, so drop any free text.
+        Picker(FLOORS.map { if (it < 0) "B${-it}" else "${it}F" }, FLOORS.indexOf(floor)) { manualSpot = ""; floor = FLOORS[it]; onSpotEdited() }
         Label("기둥 번호  ${pillarCode.ifBlank { "—" }}")
         // Each tap appends, so codes such as AL02 or B-15 can be built; leading zeros are kept.
-        Picker(LETTERS.map(Char::toString), -1) { pillarCode = (pillarCode + LETTERS[it]).take(8); onSpotEdited() }
+        Picker(LETTERS.map(Char::toString), -1) { manualSpot = ""; pillarCode = (pillarCode + LETTERS[it]).take(8); onSpotEdited() }
         Picker((1..9).map(Int::toString) + "0" + "-" + "⌫" + "전체 지우기", -1) { index ->
             Log.i(TAG, "pillar key $index (was $pillarCode)")
             pillarCode = when (index) {
@@ -1255,7 +1281,7 @@ class MainActivity : ComponentActivity() {
             OutlinedTextField(
                 value = manualSpot,
                 onValueChange = { manualSpot = it.take(40); onSpotEdited() },
-                label = { Text("주차 위치 직접 입력 (예: 지하2층 AL02 동편)") },
+                label = { Text("주차 위치 직접 입력 (예: 주차타워 3번, 정문 옆 편의점 앞)") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
