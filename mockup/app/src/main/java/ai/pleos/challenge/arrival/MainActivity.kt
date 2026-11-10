@@ -1069,10 +1069,12 @@ class MainActivity : ComponentActivity() {
             Spacer(Modifier.width(20.dp))
             GearState()
             Spacer(Modifier.weight(1f))
-            // Organizing a trip (LOGBOOK) starts from the today tab, so it keeps that tab lit.
-            Tab("오늘", screen == Screen.HOME || screen == Screen.LOGBOOK) { leaveFlow(); screen = Screen.HOME }
-            Tab("운행일지", screen == Screen.RECORDS) { leaveFlow(); screen = Screen.RECORDS }
-            Tab("발자취", screen == Screen.JOURNEY) { leaveFlow(); screen = Screen.JOURNEY }
+            // Tabs carry the brand names: My Route is the home (named after the app, Route94),
+            // My Story the logbook (운행일지), My Discovery the footprints (발자취).
+            // Organizing a trip (LOGBOOK) starts from the home tab, so it keeps that tab lit.
+            Tab("My Route", screen == Screen.HOME || screen == Screen.LOGBOOK) { leaveFlow(); screen = Screen.HOME }
+            Tab("My Story", screen == Screen.RECORDS) { leaveFlow(); screen = Screen.RECORDS }
+            Tab("My Discovery", screen == Screen.JOURNEY) { leaveFlow(); screen = Screen.JOURNEY }
             Spacer(Modifier.width(8.dp))
             SettingsMenu()
         }
@@ -1234,7 +1236,7 @@ class MainActivity : ComponentActivity() {
                 val month = LogbookLink.tripsIn(trips, java.time.YearMonth.now())
                 val sum = LogbookLink.summary(month)
                 SummaryRow(
-                    title = "운행일지",
+                    title = "My Story",
                     value = when {
                         pending != null -> km(pending.distanceKm)
                         recording -> "기록 중"
@@ -1256,7 +1258,7 @@ class MainActivity : ComponentActivity() {
                 }
                 Rule()
                 SummaryRow(
-                    title = "주차 위치",
+                    title = "My Stop",
                     value = last?.spot ?: "기록 없음",
                     caption = if (last == null) "" else "마지막 주차",
                     details = if (last == null) listOf("운행일지와 따로 주차 위치만 남길 수 있어요")
@@ -1267,7 +1269,7 @@ class MainActivity : ComponentActivity() {
                 Rule()
                 val journey = JourneyDays.today(journeys, System.currentTimeMillis())
                 SummaryRow(
-                    title = "발자취",
+                    title = "My Discovery",
                     value = "${journey?.stops?.size ?: 0}곳",
                     caption = "오늘 들른 곳",
                     details = listOf(
@@ -1290,7 +1292,7 @@ class MainActivity : ComponentActivity() {
         title: String, value: String, caption: String, details: List<String>, action: @Composable () -> Unit,
     ) {
         Row(Modifier.weight(1f).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            Heading(title, Modifier.width(170.dp))
+            Heading(title, Modifier.width(210.dp))
             Column(Modifier.weight(1.1f)) {
                 Text(value, fontSize = Ui.Value, fontWeight = FontWeight.Bold, color = Ui.Ink, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 56.sp)
                 if (caption.isNotBlank()) Note(caption)
