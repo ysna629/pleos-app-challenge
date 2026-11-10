@@ -1,7 +1,17 @@
-# 도착노트 (가칭)
+# 도착노트
+
+**주차하는 순간, 차가 묻고 운전자는 대답만 합니다.** 운행일지와 주차 위치, 나들이에서 들른 곳을 차량이 알아서 기록하는 Pleos Connect 앱입니다.
 
 현대자동차그룹 **차량용 앱 개발 공모전 — Code your App into Pleos App Market** 출품작입니다.
-Pleos Connect(Android Automotive OS)용 앱으로, 차량이 **운행일지**와 **주차 위치**, **나들이 여행 기록**을 알아서 남기고 운전자는 말로 정리합니다.
+
+| 항목 | 내용 |
+|---|---|
+| 앱 이름 | 도착노트 (패키지 `ai.pleos.challenge.arrival`) |
+| 한 줄 소개 | 주차하면 차가 먼저 묻고, 대답 한마디로 운행일지와 주차 위치가 기록되는 음성 도착 비서 |
+| 실행 방법 | [아래 실행 방법](#실행-방법) |
+| 테스트 환경 | [아래 테스트 환경](#테스트-환경) |
+| 필요한 설정 | [아래 필요한 설정](#필요한-설정) |
+| APK | [아래 APK](#apk) |
 
 ## 이런 문제를 풉니다
 
@@ -99,6 +109,24 @@ adb shell am start --user 10 -n ai.pleos.challenge.arrival/.MainActivity --ez de
 cd mockup && ./gradlew testDebugUnitTest   # 단위 테스트 73개
 node --test viewer/journey-export.test.mjs   # 웹 페이지 테스트 8개
 ```
+
+## 필요한 설정
+
+- **권한:** 첫 실행 때 앱이 요청하는 마이크, 위치(`pleos.car.permission.FUSED_LOCATION`), 알림 권한을 허용합니다. 거부해도 앱은 동작하지만 음성·지도 링크·도착 알림이 빠집니다.
+- **개인정보 동의:** 첫 화면에서 "동의하고 시작"을 눌러야 차량 신호를 읽기 시작합니다.
+- **휴대폰 번호:** 문자 QR을 쓰려면 운행일지 탭에서 내 번호를 한 번 입력합니다. 차량 안에만 저장됩니다.
+- **서버·계정:** 필요 없습니다. 휴대폰 웹 페이지(https://pleos-note.vercel.app)는 정적 파일이라 기록이 서버로 가지 않습니다.
+- **선택 사항:** 여행 탭의 주변 장소 검색은 카카오 REST API 키를 로컬 Gradle 속성 `kakaoRestApiKey`로 넣고 빌드하면 켜집니다. 키 없이도 나머지 기능은 모두 동작합니다.
+
+## APK
+
+릴리스 APK는 `apk/` 폴더에 둡니다. 서명 키는 저장소에 포함하지 않습니다.
+
+```
+apk/<팀명>_도착노트_release.apk
+```
+
+설치: `adb install -r --user 10 apk/<파일명>.apk` (Pleos 에뮬레이터는 사용자 10에서 앱이 실행됩니다.)
 
 ## 테스트 환경
 
