@@ -157,7 +157,10 @@ data class LogbookProfile(
         )
     }
 
-    fun get(key: String): String = fields()[key].orEmpty()
+    fun get(key: String): String = when (key) {
+        "company" -> company; "bizNo" -> bizNo; "model" -> model; "plate" -> plate; "dept" -> dept; "name" -> name
+        else -> ""
+    }
 
     fun with(key: String, value: String): LogbookProfile = when (key) {
         "company" -> copy(company = value); "bizNo" -> copy(bizNo = value); "model" -> copy(model = value)
