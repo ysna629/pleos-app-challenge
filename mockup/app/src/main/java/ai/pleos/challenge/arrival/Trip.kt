@@ -126,7 +126,7 @@ data class ParkingNote(
     }
 }
 
-/** Usage categories of the NTS business-vehicle logbook (업무용승용차 운행기록부). */
+/** Usage categories of the logbook form (운행기록부). */
 enum class Purpose(val label: String, val short: String, val code: Char) {
     COMMUTE("출퇴근", "출퇴근", 'C'),
     BUSINESS("일반 업무", "업무", 'B'),
