@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,6 +56,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -932,6 +935,12 @@ class MainActivity : ComponentActivity() {
             surface = Ui.Panel, onSurface = Ui.Ink, surfaceVariant = Ui.Raised, onSurfaceVariant = Ui.Muted, outline = Ui.Line,
         )
         MaterialTheme(colorScheme = colors) {
+            // Leaving a screen, or closing the free-text field, takes the keyboard down with it.
+            val keyboard = LocalSoftwareKeyboardController.current
+            val focus = LocalFocusManager.current
+            LaunchedEffect(screen, showManual, step) {
+                if (!showManual || step == Step.IDLE) { focus.clearFocus(); keyboard?.hide() }
+            }
             Surface(modifier = Modifier.fillMaxSize(), color = Ui.Bg) {
                 if (showsDrivingScreen(drivingRestricted, parked)) {
                     DrivingScreen(consented, listening, partial, drivingStatus, onSave = ::savePassingPlace, onSpeak = ::callAssistant)
