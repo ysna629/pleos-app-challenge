@@ -45,4 +45,35 @@ class JourneyDaysTest {
         assertEquals(2, next.first().stops.size)
         assertEquals(old, next.last())
     }
+
+    @Test fun todayIsOnlyTheOpenCollectionStartedToday() {
+        val lateNight = at("2026-11-06T14:50:00Z")
+        val yesterday = JourneyDays.onGear(emptyList(), true, lateNight, null, zone)
+        assertEquals(yesterday.single(), JourneyDays.today(yesterday, lateNight + 60_000, zone))
+        // Past midnight nothing has closed it yet, but it is not today's record either.
+        assertNull(JourneyDays.today(yesterday, lateNight + 3_600_000, zone))
+    }
+
+    @Test fun pastDaysKeepOnlyStarredStopsAndNoRoute() {
+        val now = at("2026-11-06T01:00:00Z")
+        val point = JourneyPoint(37.5, 127.0, now)
+        val open = Journey("today", "오늘", now, route = listOf(point), stops = listOf(JourneyStop("a", now, point)))
+        val starred = Journey("past", "지난 날", now - 86_400_000, now - 80_000_000, route = listOf(point),
+            stops = listOf(JourneyStop("b", now - 86_000_000, point, favorite = true), JourneyStop("c", now - 85_000_000, point)))
+        val plain = Journey("gone", "지난 날", now - 172_800_000, now - 170_000_000, route = listOf(point), stops = listOf(JourneyStop("d", now - 172_000_000, point)))
+        val kept = JourneyDays.keepStarred(listOf(open, starred, plain))
+        assertEquals(listOf("today", "past"), kept.map { it.id })
+        assertEquals(open, kept.first())
+        assertEquals(listOf("b"), kept.last().stops.map { it.id })
+        assertTrue(kept.last().route.isEmpty())
+    }
+
+    @Test fun savedPlacesListStarredStopsNewestFirstAcrossDays() {
+        val now = at("2026-11-06T01:00:00Z")
+        val today = Journey("today", "오늘", now, stops = listOf(JourneyStop("a", now, null, favorite = true), JourneyStop("b", now + 1000, null)))
+        val past = Journey("past", "지난 날", now - 86_400_000, now - 80_000_000, stops = listOf(JourneyStop("c", now - 86_000_000, null, favorite = true)))
+        val places = savedPlaces(listOf(today, past))
+        assertEquals(listOf("a", "c"), places.map { it.stop.id })
+        assertEquals(listOf("today", "past"), places.map { it.journeyId })
+    }
 }

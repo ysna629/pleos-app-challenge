@@ -13,7 +13,7 @@ import java.util.Locale
 enum class StopMapApp(val label: String) {
     KAKAO("카카오맵"),
     NAVER("네이버 지도"),
-    GOOGLE("구글맵"),
+    GOOGLE("구글 지도"),
 }
 
 /** Naver's scheme requires the caller's application id on every link. */
