@@ -137,7 +137,7 @@ fun SharePanel(
         modifier.width(Ui.ShareWidth).fillMaxHeight().background(Ui.Panel, Ui.Shape).padding(28.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Heading("휴대폰으로 받기")
+        Heading("휴대폰으로 열기")
         // With a single thing to send there is nothing to choose, only to name.
         if (options.size > 1) Segmented(options, selected, onSelect = onSelect)
         else Text(options.first(), fontSize = Ui.Body, color = Ui.Muted)

@@ -44,7 +44,7 @@ fun JourneyQrShare(
         }
         Note(if (csv) "QR마다 스캔해서 저장해야 전체 방문이 보관돼요." else "방문 기록이 여러 QR로 나뉘었어요. 차례로 스캔해 주세요.", color = Ui.Warn)
     }
-    Note(if (csv) "카메라로 스캔해 휴대폰에서 CSV를 받고 엑셀로 열어요." else "카메라로 스캔하면 방문 장소와 별표, 메모가 열려요.")
+    Note(if (csv) "스캔하면 휴대폰에 CSV가 저장돼요. 엑셀로 열 수 있어요." else "스캔하면 오늘 들른 곳과 별표, 메모가 휴대폰에서 열려요.")
     if (csv) {
         QuietButton("차량에 CSV 저장") { onSave(snapshot) }
         if (message.isNotBlank()) Note(message, color = Ui.Accent)
@@ -60,8 +60,8 @@ fun StopMapShare(stop: JourneyStop?, app: StopMapApp, onPick: (StopMapApp) -> Un
     Segmented(StopMapApp.entries.map { it.label }, StopMapApp.entries.indexOf(app)) { onPick(StopMapApp.entries[it]) }
     QrPlate(stop.mapQrLink(app), "지도 열기 QR", empty = "위치와 주소가 없어 지도를 열 수 없어요.")
     Note(
-        (if (app == StopMapApp.GOOGLE) "카메라로 스캔하면 구글 지도가 열려요. 앱이 없으면 브라우저에서 열려요."
-        else "카메라로 스캔하면 ${app.label} 앱이 열려요. 앱이 설치되어 있어야 해요.") + " 기본 지도 앱은 설정에서 정해요.",
+        (if (app == StopMapApp.GOOGLE) "스캔하면 구글 지도가 열려요. 앱이 없으면 브라우저에서 열려요."
+        else "스캔하면 ${app.label} 앱이 열려요. 앱이 설치되어 있어야 해요.") + " 기본 지도 앱은 설정에서 정해요.",
     )
     Note(
         (if (stop.point?.valid == true) "저장된 주차 좌표를 열어요. 실제 입구와 다를 수 있어요." else "GPS 좌표가 없어 기록된 주소로 검색해요.") +
