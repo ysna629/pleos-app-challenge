@@ -1289,7 +1289,10 @@ class MainActivity : ComponentActivity() {
             Modifier.fillMaxWidth().padding(top = 16.dp).background(Ui.Panel, Ui.Shape).padding(horizontal = 24.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            MicButton("말하기", enabled = step == Step.IDLE) { callAssistant() }
+            // One control: 말하기 when idle, 취소 while it listens.
+            MicButton("말하기", enabled = step == Step.IDLE, listening = step == Step.HEAR_COMMAND) {
+                if (step == Step.HEAR_COMMAND) cancelListening() else callAssistant()
+            }
             Spacer(Modifier.width(28.dp))
             Column(Modifier.weight(1f)) {
                 when {
@@ -1301,8 +1304,6 @@ class MainActivity : ComponentActivity() {
                 if (heard.isNotBlank() && step != Step.HEAR_COMMAND) Note("들은 말: \"$heard\"")
                 if (notice.isNotBlank() && step == Step.HEAR_COMMAND) Note(notice, color = Ui.Warn)
             }
-            // The mic button stays where it is while listening, so a second tap cannot land on 취소 by accident.
-            if (step == Step.HEAR_COMMAND) QuietButton("취소") { cancelListening() }
         }
     }
 

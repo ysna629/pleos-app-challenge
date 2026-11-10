@@ -160,17 +160,32 @@ fun QrPlate(text: String?, description: String, empty: String, size: Dp = 320.dp
     }
 }
 
-/** The mic button used on every tab. Drawn, so it looks the same on any system font. */
+/**
+ * The mic button used on every tab. Drawn, so it looks the same on any system font. While [listening] the same
+ * button turns into a stop button, so the thumb that started the mic is already on the control that cancels it.
+ */
 @Composable
-fun MicButton(label: String, enabled: Boolean, modifier: Modifier = Modifier, large: Boolean = false, onClick: () -> Unit) {
+fun MicButton(label: String, enabled: Boolean, modifier: Modifier = Modifier, large: Boolean = false, listening: Boolean = false, onClick: () -> Unit) {
+    val size = if (large) 52.dp else 32.dp
     Button(
-        onClick = onClick, enabled = enabled, shape = Ui.ControlShape, modifier = modifier,
-        colors = ButtonDefaults.buttonColors(containerColor = Ui.Accent, contentColor = Ui.OnAccent),
+        onClick = onClick, enabled = enabled || listening, shape = Ui.ControlShape, modifier = modifier,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (listening) Ui.Raised else Ui.Accent, contentColor = if (listening) Ui.Ink else Ui.OnAccent,
+        ),
         contentPadding = PaddingValues(horizontal = 28.dp, vertical = 18.dp),
     ) {
-        MicIcon(if (enabled) Ui.OnAccent else Ui.Muted, if (large) 52.dp else 32.dp)
+        if (listening) StopIcon(Ui.Warn, size) else MicIcon(if (enabled) Ui.OnAccent else Ui.Muted, size)
         Spacer(Modifier.width(if (large) 20.dp else 14.dp))
-        Text(label, fontSize = if (large) 44.sp else 28.sp, fontWeight = FontWeight.Bold)
+        Text(if (listening) "취소" else label, fontSize = if (large) 44.sp else 28.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** A rounded square: stop listening. */
+@Composable
+fun StopIcon(color: Color, size: Dp) {
+    Canvas(Modifier.size(size)) {
+        val w = this.size.width
+        drawRoundRect(color, Offset(w * 0.2f, w * 0.2f), Size(w * 0.6f, w * 0.6f), CornerRadius(w * 0.12f))
     }
 }
 
