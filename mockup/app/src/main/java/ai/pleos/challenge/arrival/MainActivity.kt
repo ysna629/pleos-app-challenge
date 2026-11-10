@@ -20,6 +20,11 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -53,6 +58,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -931,7 +937,15 @@ class MainActivity : ComponentActivity() {
             surface = Ui.Panel, onSurface = Ui.Ink, surfaceVariant = Ui.Raised, onSurfaceVariant = Ui.Muted, outline = Ui.Line,
         )
         MaterialTheme(colorScheme = colors) {
-            Surface(modifier = Modifier.fillMaxSize(), color = Ui.Bg) {
+            // Leaving a screen, or closing the free-text field, takes the keyboard down with it.
+            val keyboard = LocalSoftwareKeyboardController.current
+            val focus = LocalFocusManager.current
+            LaunchedEffect(screen, showManual, step) {
+                if (!showManual || step == Step.IDLE) { focus.clearFocus(); keyboard?.hide() }
+            }
+            // A tap on empty space also takes the keyboard down; buttons and fields consume their own taps first.
+            val dismiss = Modifier.pointerInput(Unit) { detectTapGestures(onTap = { focus.clearFocus(); keyboard?.hide() }) }
+            Surface(modifier = Modifier.fillMaxSize().then(dismiss), color = Ui.Bg) {
                 if (showsDrivingScreen(drivingRestricted, parked)) {
                     DrivingScreen(consented, listening, partial, drivingStatus, onSave = ::savePassingPlace, onSpeak = ::callAssistant)
                     return@Surface
@@ -1350,8 +1364,9 @@ class MainActivity : ComponentActivity() {
     private fun RowScope.AssistantPanel(content: @Composable () -> Unit) {
         Panel(Modifier.weight(1.4f).verticalScroll(rememberScrollState())) {
             Text(question, fontSize = Ui.Title, fontWeight = FontWeight.Bold, color = Ui.Ink, lineHeight = 44.sp)
+            // Always one line here, so the keys and buttons below do not jump when listening ends.
             if (listening) Note("듣고 있어요  $partial", color = Ui.Accent, modifier = Modifier.padding(top = 8.dp))
-            else if (heard.isNotBlank()) Note("들은 말: \"$heard\"", modifier = Modifier.padding(top = 8.dp))
+            else Note(if (heard.isNotBlank()) "들은 말: \"$heard\"" else " ", modifier = Modifier.padding(top = 8.dp))
             if (notice.isNotBlank()) Note(notice, color = Ui.Warn)
             Spacer(Modifier.height(20.dp))
             content()
@@ -1362,8 +1377,12 @@ class MainActivity : ComponentActivity() {
     private fun SpotPicker() {
         val spot = parkingText()
         val reviewing = step in setOf(Step.ASK_CONFIRM, Step.HEAR_CONFIRM, Step.REVIEW_SPOT)
+        // While the field has focus the keyboard is up: the key grids are useless then and would push the buttons
+        // under it (the IME's touch area reaches above its visible keys), so only the field and the buttons stay.
+        var typing by remember { mutableStateOf(false) }
         Text(spot.ifBlank { "주차 위치" }, fontSize = Ui.Value, fontWeight = FontWeight.Bold, color = if (spot.isBlank()) Ui.Muted else Ui.Ink)
         Spacer(Modifier.height(16.dp))
+        if (!typing) {
         Note("층이 없는 곳")
         val presets = listOf(ParkingText.TOWER, ParkingText.OUTDOOR)
         Keys(presets, presets.indexOfFirst { manualSpot.startsWith(it) }) { setFreeSpot(presets[it]); onSpotEdited() }
@@ -1384,6 +1403,7 @@ class MainActivity : ComponentActivity() {
             }
             onSpotEdited()
         }
+        }
         if (showManual) {
             OutlinedTextField(
                 value = manualSpot,
@@ -1391,7 +1411,7 @@ class MainActivity : ComponentActivity() {
                 label = { Text("주차 위치 직접 입력 (예: 주차타워 3번, 정문 옆 편의점 앞)") },
                 singleLine = true,
                 textStyle = TextStyle(fontSize = Ui.Body),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().onFocusChanged { typing = it.isFocused },
             )
             Spacer(Modifier.height(12.dp))
         }
