@@ -1013,6 +1013,13 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun TopBar() {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // 오늘 is the main screen; every other screen is something opened from it, so it gets a way back.
+            if (screen != Screen.HOME) {
+                IconButton(onClick = { goBack() }, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로", tint = Ui.Ink, modifier = Modifier.size(36.dp))
+                }
+                Spacer(Modifier.width(8.dp))
+            }
             Text("도착노트", fontSize = Ui.Title, fontWeight = FontWeight.Bold, color = Ui.Ink)
             Spacer(Modifier.width(20.dp))
             GearState()
@@ -1058,8 +1065,7 @@ class MainActivity : ComponentActivity() {
         var showConsent by remember { mutableStateOf(false) }
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
             Panel(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
-                BackHeader("설정") { screen = beforeSettings }
-                Spacer(Modifier.height(12.dp))
+                ScreenTitle("설정")
                 Text("내 설정", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
                 Spacer(Modifier.height(12.dp))
                 PhoneField()
@@ -1097,17 +1103,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Title row with a back arrow for screens that are not tabs: settings and the organizing flow. */
-    @Composable
-    private fun BackHeader(title: String, onBack: () -> Unit) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-            IconButton(onClick = onBack, modifier = Modifier.size(52.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로", tint = Ui.Ink, modifier = Modifier.size(34.dp))
-            }
-            Spacer(Modifier.width(8.dp))
-            Heading(title)
+    /** The top-left arrow: settings returns to where it was opened, the organizing flow ends, everything else goes to 오늘. */
+    private fun goBack() {
+        when (screen) {
+            Screen.SETTINGS -> screen = beforeSettings
+            Screen.LOGBOOK -> { leaveFlow(); screen = Screen.HOME }
+            else -> screen = Screen.HOME
         }
     }
+
+    /** Title row for screens that are not tabs. */
+    @Composable
+    private fun ScreenTitle(title: String) = Heading(title, Modifier.padding(bottom = 16.dp))
 
     @Composable
     private fun GearState() {
@@ -1282,7 +1289,7 @@ class MainActivity : ComponentActivity() {
         if (parkOnly) return ParkOnlyScreen()
         val trip = draft ?: return HomeScreen()
         Column {
-        BackHeader("운행 기록") { leaveFlow(); screen = Screen.HOME }
+        ScreenTitle("운행 기록")
         Row(horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
             Panel(Modifier.weight(0.8f)) {
                 Heading("기록한 운행")
@@ -1310,7 +1317,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun ParkOnlyScreen() {
         Column {
-        BackHeader("주차 위치 기록") { leaveFlow(); screen = Screen.HOME }
+        ScreenTitle("주차 위치 기록")
         Row(horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
             Panel(Modifier.weight(0.8f)) {
                 Heading("주차 위치만 기록")
