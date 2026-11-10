@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">
-<title>도착노트 · 우리의 발자취</title>
+<title>Route94 · 우리의 발자취</title>
 <style>
 :root{color-scheme:light dark;--bg:#f3f6f5;--card:#fff;--ink:#17332f;--muted:#60736e;--line:#dce6e2;--accent:#147a67}
 @media(prefers-color-scheme:dark){:root{--bg:#101b20;--card:#1b2b31;--ink:#edf5f1;--muted:#a5b9b1;--line:#34474b;--accent:#79d6bc}}
@@ -10,11 +10,11 @@
 </style>
 </head>
 <body><main>
-<div class="brand">도착노트 / 우리의 발자취</div>
-<h1 id="title">여행 기록을 여는 중…</h1><p id="status" role="status" class="muted"></p>
+<div class="brand">Route94 / 우리의 발자취</div>
+<h1 id="title">발자취를 여는 중…</h1><p id="status" role="status" class="muted"></p>
 <div id="content" hidden>
-<p id="sample" class="badge" hidden>예시 여행 · 가상의 장소 이름과 경로입니다.</p>
-<div class="stats"><div><b id="count"></b><span class="muted">방문 기록</span></div><div><b id="favorites"></b><span class="muted">다시 갈 곳</span></div><div><b id="distance"></b><span class="muted">수집 GPS 거리</span></div></div>
+<p id="sample" class="badge" hidden>예시 기록 · 가상의 장소 이름과 경로입니다.</p>
+<div class="stats"><div><b id="count"></b><span class="muted">방문 기록</span></div><div><b id="favorites"></b><span class="muted">발자국</span></div><div><b id="distance"></b><span class="muted">수집 GPS 거리</span></div></div>
 <p id="part" class="muted"></p><section id="visits" aria-label="방문 장소"></section>
 <p class="privacy muted">지도는 수집된 주차 좌표를 표시해요. 실제 방문 장소의 입구와 다를 수 있어요. GPS가 없으면 기록된 장소명·주소로 검색해요. 카카오맵 링크를 누르면 해당 위치나 검색어가 카카오에 전달됩니다.</p>
 <p class="muted">기록은 QR 링크 안에 담겨 있으며 서버에 업로드하지 않아요. 이 페이지에는 방문 기록만 포함하며 전체 이동 경로는 포함하지 않아요. 공유한 링크는 차량의 동의 철회로 지워지지 않아요.</p>
@@ -26,7 +26,7 @@ window.addEventListener('hashchange',()=>location.reload());
 try{
  const {decodeJourney,formatDate,kakaoMapLink,kakaoAppLink}=await import('./journey-export.mjs?v=20261106c');
  const data=await decodeJourney(location.hash.slice(1));
- $('title').textContent=data.title;document.title=`${data.title} · 도착노트`;
+ $('title').textContent=data.title;document.title=`${data.title} · Route94`;
  $('status').textContent=`${formatDate(data.startedAt,data.zone)}부터 · ${data.endedAt===null?'기록 중':formatDate(data.endedAt,data.zone)+'까지'}`;
  $('sample').hidden=!data.sample;$('count').textContent=`${data.stops.length}곳`;
  $('favorites').textContent=`${data.stops.filter(s=>s[6]).length}곳`;$('distance').textContent=`${data.km.toFixed(1)} km`;
@@ -35,7 +35,7 @@ try{
   const [arrive,depart,lat,lng,name,address,favorite,note,interrupted]=stop;
   const card=node('article','','visit');const heading=node('div','','heading');
   heading.append(node('span',`${data.offset+i+1}`,'number'),node('h2',name||address||'이름 없는 방문'));
-  if(favorite)heading.append(node('span','★ 다시 갈 곳','star'));card.append(heading);
+  if(favorite)heading.append(node('span','★ 발자국','star'));card.append(heading);
   if(address)card.append(node('p',address,'muted'));
   const duration=interrupted?'기록 중단 · 체류 시간 알 수 없음':`${Math.floor(Math.max(0,(depart??data.exportedAt)-arrive)/60000)}분 · ${depart===null?'머무는 중':'방문 완료'}`;
   card.append(node('p',`${formatDate(arrive,data.zone)}\n${duration}`,'muted'));
@@ -52,5 +52,5 @@ try{
  }
  if(!data.stops.length)$('visits').append(node('p','아직 방문 기록이 없어요.'));
  $('content').hidden=false;
-}catch{$('title').textContent='여행 기록을 읽지 못했어요';$('status').textContent='차량의 QR을 다시 스캔해 주세요. 최신 브라우저에서 열어 주세요.'}
+}catch{$('title').textContent='발자취를 읽지 못했어요';$('status').textContent='차량의 QR을 다시 스캔해 주세요. 최신 브라우저에서 열어 주세요.'}
 </script></body></html>

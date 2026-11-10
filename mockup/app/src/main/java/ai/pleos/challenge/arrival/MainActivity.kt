@@ -652,7 +652,7 @@ class MainActivity : ComponentActivity() {
                     val journey = journeys.firstOrNull { it.endedAt == null }
                     val stop = journey?.stops?.lastOrNull()
                     if (showsDrivingScreen(drivingRestricted, parked)) savePassingPlace()
-                    else if (journeyPreview) say(Step.IDLE, "예시 화면이에요. 실제 경유지를 저장하려면 예시 여행 보기를 꺼 주세요.")
+                    else if (journeyPreview) say(Step.IDLE, "예시 화면이에요. 실제 경유지를 저장하려면 예시 보기를 꺼 주세요.")
                     else if (parked == true && journey != null && stop != null) {
                         updateJourneyStop(journey.id, stop.id) { it.copy(favorite = true) }
                         step = Step.IDLE
@@ -976,7 +976,7 @@ class MainActivity : ComponentActivity() {
             Modifier.fillMaxSize().padding(48.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            Text("도착노트", fontSize = Ui.Title, fontWeight = FontWeight.Bold, color = Ui.Ink)
+            Text("Route94", fontSize = Ui.Title, fontWeight = FontWeight.Bold, color = Ui.Ink)
             Heading("시작하기 전에 개인정보 수집·이용에 동의해 주세요")
             Panel(Modifier.fillMaxWidth()) {
                 Note("수집하는 정보와 쓰는 곳")
@@ -1023,14 +1023,14 @@ class MainActivity : ComponentActivity() {
                 }
                 Spacer(Modifier.width(8.dp))
             }
-            Text("도착노트", fontSize = Ui.Title, fontWeight = FontWeight.Bold, color = Ui.Ink)
+            Text("Route94", fontSize = Ui.Title, fontWeight = FontWeight.Bold, color = Ui.Ink)
             Spacer(Modifier.width(20.dp))
             GearState()
             Spacer(Modifier.weight(1f))
             // Organizing a trip (LOGBOOK) starts from the today tab, so it keeps that tab lit.
             Tab("오늘", screen == Screen.HOME || screen == Screen.LOGBOOK) { leaveFlow(); screen = Screen.HOME }
             Tab("운행일지", screen == Screen.RECORDS) { leaveFlow(); screen = Screen.RECORDS }
-            Tab("여행", screen == Screen.JOURNEY) { leaveFlow(); screen = Screen.JOURNEY }
+            Tab("발자취", screen == Screen.JOURNEY) { leaveFlow(); screen = Screen.JOURNEY }
             Spacer(Modifier.width(8.dp))
             SettingsMenu()
         }
@@ -1078,7 +1078,7 @@ class MainActivity : ComponentActivity() {
                 Spacer(Modifier.height(8.dp))
                 Segmented(MapApp.entries.map { it.label }, MapApp.entries.indexOf(mapApp)) { mapApp = MapApp.entries[it]; store.mapApp = mapApp }
                 Spacer(Modifier.height(20.dp))
-                Note("여행 장소를 여는 지도 앱")
+                Note("발자취 장소를 여는 지도 앱")
                 Spacer(Modifier.height(8.dp))
                 Segmented(StopMapApp.entries.map { it.label }, StopMapApp.entries.indexOf(stopMapApp)) { stopMapApp = StopMapApp.entries[it]; journeyStore.stopMapApp = stopMapApp }
                 Rule(Modifier.padding(vertical = 28.dp))
@@ -1186,15 +1186,15 @@ class MainActivity : ComponentActivity() {
                 Rule()
                 val journey = JourneyDays.today(journeys, System.currentTimeMillis())
                 SummaryRow(
-                    title = "여행",
+                    title = "발자취",
                     value = "${journey?.stops?.size ?: 0}곳",
                     caption = "오늘 들른 곳",
                     details = listOf(
                         String.format(Locale.KOREA, "오늘 이동 %.1f km", journey?.distanceKm ?: 0.0),
-                        "다시 갈 곳 ${savedPlaces(journeys).size}곳",
+                        "발자국 ${savedPlaces(journeys).size}곳",
                     ),
                 ) {
-                    QuietButton("여행 보기", Modifier.fillMaxWidth()) { journeyPreview = false; screen = Screen.JOURNEY }
+                    QuietButton("발자취 보기", Modifier.fillMaxWidth()) { journeyPreview = false; screen = Screen.JOURNEY }
                 }
             }
             SharePanel(listOf("마지막 주차 위치 문자"), 0, {}) {
@@ -1434,7 +1434,7 @@ class MainActivity : ComponentActivity() {
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
             Panel(Modifier.weight(1f).fillMaxHeight()) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Heading("업무용승용차 운행기록부", Modifier.weight(1f))
+                    Heading("운행기록부", Modifier.weight(1f))
                     IconButton(onClick = { monthIndex++ }, enabled = monthIndex < months.lastIndex, modifier = Modifier.size(52.dp)) {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "이전 달", modifier = Modifier.size(36.dp))
                     }

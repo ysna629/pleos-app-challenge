@@ -12,7 +12,7 @@ object Commands {
             // Before SAVE_PLACE ("기억해"), WHERE_PARKED ("주차위치") and LOGBOOK ("기록"), which these phrases also contain.
             listOf("주차위치기록", "주차기록", "주차위치저장", "주차저장", "주차위치남겨", "주차위치기억", "주차메모", "주차위치메모", "주차위치만", "주차만", "여기주차").any(text::contains) -> Intent.PARK_ONLY
             listOf("여기저장", "이곳저장", "장소저장", "여기기억", "여기를기억", "이곳기억", "기억해", "찜해", "괜찮은데").any(text::contains) -> Intent.SAVE_PLACE
-            listOf("여행기록", "여행지도", "나들이", "여행보여").any(text::contains) -> Intent.JOURNEY
+            listOf("발자취", "여행기록", "여행지도", "나들이", "여행보여").any(text::contains) -> Intent.JOURNEY
             listOf("어디주차", "주차어디", "주차위치", "차어디", "어디세웠", "어디댔").any(text::contains) -> Intent.WHERE_PARKED
             listOf("운행일지", "운행기록", "일지", "정리", "기록").any(text::contains) -> Intent.LOGBOOK
             else -> Intent.UNKNOWN
