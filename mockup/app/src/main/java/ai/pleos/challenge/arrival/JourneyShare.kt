@@ -31,9 +31,10 @@ fun JourneyQrShare(
     val links = result.getOrDefault(emptyList())
     var index by remember(snapshot, csv) { mutableIntStateOf(0) }
     Text("${snapshot.journey.title}, 방문 ${snapshot.journey.stops.size}곳", fontSize = Ui.Body, color = Ui.Ink)
+    // The record QR carries the data itself, so it is denser than the others and gets the full column width.
     QrPlate(
         links.getOrNull(index), "${if (csv) "엑셀 다운로드" else "발자취 기록 보기"} QR ${index + 1}/${links.size}",
-        empty = result.exceptionOrNull()?.message ?: "QR을 만들지 못했어요.",
+        empty = result.exceptionOrNull()?.message ?: "QR을 만들지 못했어요.", size = 380.dp,
     )
     if (links.size > 1) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
