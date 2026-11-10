@@ -133,6 +133,39 @@ enum class Purpose(val label: String, val short: String, val code: Char) {
     PERSONAL("비업무", "비업무", 'P'),
 }
 
+/**
+ * The 기본 정보 block of the logbook form (`viewer/index.html`): company, business number, car model, plate, department,
+ * driver. Any field may stay blank; the phone page then shows an empty cell. Keys match the page's field ids.
+ */
+data class LogbookProfile(
+    val company: String = "", val bizNo: String = "", val model: String = "",
+    val plate: String = "", val dept: String = "", val name: String = "",
+) {
+    /** Only what was filled in, keyed as the viewer page expects. */
+    fun fields(): Map<String, String> = mapOf(
+        "company" to company, "bizNo" to bizNo, "model" to model, "plate" to plate, "dept" to dept, "name" to name,
+    ).filterValues { it.isNotBlank() }
+
+    fun toJson(): JSONObject = JSONObject().apply { fields().forEach { (k, v) -> put(k, v) } }
+
+    companion object {
+        /** Settings-screen order and labels, the same as on the form. */
+        val LABELS = listOf("company" to "상호(법인명)", "bizNo" to "사업자등록번호", "model" to "차종", "plate" to "자동차등록번호", "dept" to "부서", "name" to "성명")
+
+        fun fromJson(o: JSONObject) = LogbookProfile(
+            o.optString("company"), o.optString("bizNo"), o.optString("model"), o.optString("plate"), o.optString("dept"), o.optString("name"),
+        )
+    }
+
+    fun get(key: String): String = fields()[key].orEmpty()
+
+    fun with(key: String, value: String): LogbookProfile = when (key) {
+        "company" -> copy(company = value); "bizNo" -> copy(bizNo = value); "model" -> copy(model = value)
+        "plate" -> copy(plate = value); "dept" -> copy(dept = value); "name" -> copy(name = value)
+        else -> this
+    }
+}
+
 /** Map apps whose web links open on both iPhone and Android, from an SMS or a camera scan. */
 enum class MapApp(val label: String) {
     KAKAO("카카오맵") {
@@ -180,6 +213,11 @@ class TripStore(context: Context) {
     var phone: String
         get() = prefs.getString("phone", "").orEmpty()
         set(value) = prefs.edit().putString("phone", value).apply()
+
+    /** The logbook form's header, typed once in settings. */
+    var profile: LogbookProfile
+        get() = runCatching { LogbookProfile.fromJson(JSONObject(prefs.getString("profile", "{}").orEmpty())) }.getOrDefault(LogbookProfile())
+        set(value) = prefs.edit().putString("profile", value.toJson().toString()).apply()
 
     var mapApp: MapApp
         get() = runCatching { MapApp.valueOf(prefs.getString("map", "").orEmpty()) }.getOrDefault(MapApp.GOOGLE)

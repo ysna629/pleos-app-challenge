@@ -138,6 +138,7 @@ class MainActivity : ComponentActivity() {
     private var notice by mutableStateOf("")
     private var phone by mutableStateOf("")
     private var mapApp by mutableStateOf(MapApp.GOOGLE)
+    private var profile by mutableStateOf(LogbookProfile())
     private var consented by mutableStateOf(false)
     private var declined by mutableStateOf(false)
     private var confirmWithdraw by mutableStateOf(false)
@@ -212,6 +213,7 @@ class MainActivity : ComponentActivity() {
         segments.addAll(segmentStore.load())
         parkingNotes.addAll(store.loadParking())
         phone = store.phone
+        profile = store.profile
         mapApp = store.mapApp
         consentStore = ConsentStore(this)
         journeyStore = JourneyStore(this)
@@ -316,6 +318,7 @@ class MainActivity : ComponentActivity() {
         journeyShareRequest = null
         exportMessage = ""
         phone = ""
+        profile = LogbookProfile()
         draft = null
         step = Step.IDLE
         showBanner = false
@@ -1086,7 +1089,7 @@ class MainActivity : ComponentActivity() {
                 Text("내 설정", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
                 Spacer(Modifier.height(12.dp))
                 PhoneField()
-                Note("문자 QR의 받는 사람으로만 써요.", modifier = Modifier.padding(top = 6.dp))
+                Note("기록 페이지에서 문자를 보낼 때 받는 사람으로 써요.", modifier = Modifier.padding(top = 6.dp))
                 Spacer(Modifier.height(20.dp))
                 Note("주차 위치 문자의 지도 링크")
                 Spacer(Modifier.height(8.dp))
@@ -1116,8 +1119,32 @@ class MainActivity : ComponentActivity() {
                 Fact("버전", BuildConfig.VERSION_NAME)
                 Fact("보관", "모든 기록은 이 차량 안에만 저장돼요")
             }
-            Spacer(Modifier.width(Ui.ShareWidth))
+            // The form header lives beside the personal settings; every field may stay blank.
+            Panel(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+                Spacer(Modifier.height(50.dp))
+                Text("운행기록부 기본 정보", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
+                Spacer(Modifier.height(12.dp))
+                LogbookProfile.LABELS.chunked(2).forEach { pair ->
+                    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        pair.forEach { (key, label) -> ProfileField(key, label, Modifier.weight(1f)) }
+                    }
+                }
+                Note("월간 운행기록부 QR을 휴대폰으로 열면 양식 위쪽 칸이 이 값으로 채워져요. 비워 두면 빈칸으로 나와요. 모두 이 차량 안에만 저장돼요.")
+            }
         }
+    }
+
+    @Composable
+    private fun ProfileField(key: String, label: String, modifier: Modifier) {
+        OutlinedTextField(
+            value = profile.get(key),
+            onValueChange = { value -> profile = profile.with(key, value.take(40)); store.profile = profile },
+            label = { Text(label) },
+            enabled = parked == true,
+            singleLine = true,
+            textStyle = TextStyle(fontSize = Ui.Body),
+            modifier = modifier,
+        )
     }
 
     /** The top-left arrow: settings returns to where it was opened, the organizing flow ends, everything else goes to 오늘. */
@@ -1510,8 +1537,8 @@ class MainActivity : ComponentActivity() {
         Text("${month.year}년 ${month.monthValue}월", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
         if (inMonth.isEmpty()) return QrPlate(null, "월간 운행기록부 QR 코드", empty = "이 달에 기록이 생기면 QR이 나타나요.")
         val sum = LogbookLink.summary(inMonth)
-        val url = remember(month, inMonth) {
-            LogbookLink.url(trips, month, base = viewerBase())
+        val url = remember(month, inMonth, profile) {
+            LogbookLink.url(trips, month, base = viewerBase(), profile = profile)
                 .also { Log.i(TAG, "monthly ${it.length} chars $it") }
         }
         QrPlate(url, "월간 운행기록부 QR 코드", empty = "QR을 만들지 못했어요.")
