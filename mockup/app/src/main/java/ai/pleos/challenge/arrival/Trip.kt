@@ -219,10 +219,6 @@ class TripStore(context: Context) {
         get() = runCatching { LogbookProfile.fromJson(JSONObject(prefs.getString("profile", "{}").orEmpty())) }.getOrDefault(LogbookProfile())
         set(value) = prefs.edit().putString("profile", value.toJson().toString()).apply()
 
-    var mapApp: MapApp
-        get() = runCatching { MapApp.valueOf(prefs.getString("map", "").orEmpty()) }.getOrDefault(MapApp.GOOGLE)
-        set(value) = prefs.edit().putString("map", value.name).apply()
-
     /** Deletes trips, parking notes, segments and the phone number (consent withdrawn). Segments share this file. */
     fun clearAll() = prefs.edit().clear().apply()
 }

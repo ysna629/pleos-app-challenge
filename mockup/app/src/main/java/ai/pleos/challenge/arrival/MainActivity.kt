@@ -137,7 +137,8 @@ class MainActivity : ComponentActivity() {
     private var showManual by mutableStateOf(false)
     private var notice by mutableStateOf("")
     private var phone by mutableStateOf("")
-    private var mapApp by mutableStateOf(MapApp.GOOGLE)
+    /** One map choice for everything: the record page's first button and the footprint map QR. */
+    private val mapApp: MapApp get() = MapApp.valueOf(stopMapApp.name)
     private var profile by mutableStateOf(LogbookProfile())
     private var consented by mutableStateOf(false)
     private var declined by mutableStateOf(false)
@@ -214,7 +215,6 @@ class MainActivity : ComponentActivity() {
         parkingNotes.addAll(store.loadParking())
         phone = store.phone
         profile = store.profile
-        mapApp = store.mapApp
         consentStore = ConsentStore(this)
         journeyStore = JourneyStore(this)
         journeys.addAll(JourneyDays.keepStarred(journeyStore.load().map { it.resume() }))
@@ -1086,18 +1086,24 @@ class MainActivity : ComponentActivity() {
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
             Panel(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
                 ScreenTitle("설정")
-                Text("내 설정", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
+                // Everything the phone pages fill in from the car, in one place; every field may stay blank.
+                Text("기본 정보", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
                 Spacer(Modifier.height(12.dp))
                 PhoneField()
-                Note("기록 페이지에서 문자를 보낼 때 받는 사람으로 써요.", modifier = Modifier.padding(top = 6.dp))
-                Spacer(Modifier.height(20.dp))
-                Note("주차 위치 문자의 지도 링크")
-                Spacer(Modifier.height(8.dp))
-                Segmented(MapApp.entries.map { it.label }, MapApp.entries.indexOf(mapApp)) { mapApp = MapApp.entries[it]; store.mapApp = mapApp }
-                Spacer(Modifier.height(20.dp))
-                Note("발자취 장소를 여는 지도 앱")
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
+                LogbookProfile.LABELS.chunked(2).forEach { pair ->
+                    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        pair.forEach { (key, label) -> ProfileField(key, label, Modifier.weight(1f)) }
+                    }
+                }
+                Note("휴대폰 번호는 기록 페이지에서 문자를 보낼 때 받는 사람으로, 나머지는 월간 운행기록부 양식의 위쪽 칸을 채우는 데 써요. 비워 두면 빈칸으로 나와요. 모두 이 차량 안에만 저장돼요.")
+            }
+            Panel(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+                Spacer(Modifier.height(50.dp))
+                Text("지도 앱", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
+                Spacer(Modifier.height(12.dp))
                 Segmented(StopMapApp.entries.map { it.label }, StopMapApp.entries.indexOf(stopMapApp)) { stopMapApp = StopMapApp.entries[it]; journeyStore.stopMapApp = stopMapApp }
+                Note("기록 페이지와 발자취의 장소 지도 QR이 먼저 여는 지도예요. 페이지에서는 다른 지도도 고를 수 있어요.", modifier = Modifier.padding(top = 8.dp))
                 Rule(Modifier.padding(vertical = 28.dp))
                 Text("개인정보", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
                 Spacer(Modifier.height(12.dp))
@@ -1118,18 +1124,6 @@ class MainActivity : ComponentActivity() {
                 Spacer(Modifier.height(12.dp))
                 Fact("버전", BuildConfig.VERSION_NAME)
                 Fact("보관", "모든 기록은 이 차량 안에만 저장돼요")
-            }
-            // The form header lives beside the personal settings; every field may stay blank.
-            Panel(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
-                Spacer(Modifier.height(50.dp))
-                Text("운행기록부 기본 정보", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
-                Spacer(Modifier.height(12.dp))
-                LogbookProfile.LABELS.chunked(2).forEach { pair ->
-                    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        pair.forEach { (key, label) -> ProfileField(key, label, Modifier.weight(1f)) }
-                    }
-                }
-                Note("월간 운행기록부 QR을 휴대폰으로 열면 양식 위쪽 칸이 이 값으로 채워져요. 비워 두면 빈칸으로 나와요. 모두 이 차량 안에만 저장돼요.")
             }
         }
     }
