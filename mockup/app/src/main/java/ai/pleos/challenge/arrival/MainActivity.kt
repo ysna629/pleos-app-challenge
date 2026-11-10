@@ -886,6 +886,21 @@ class MainActivity : ComponentActivity() {
         say(Step.IDLE, message)
     }
 
+    /**
+     * Tapping a tab while the organizing screen is up ends what it was doing, so the driver is never stuck with a
+     * flow they cannot see. A trip, if there was one, is already saved; only the parking spot is dropped.
+     */
+    private fun leaveFlow() {
+        if (screen != Screen.LOGBOOK) return
+        listenToken++
+        voice.stopListening()
+        reply = if (parkOnly) "주차 위치 기록을 취소했어요." else "운행은 저장했어요. 주차 위치는 나중에 \"주차 위치 기록해줘\"로 남길 수 있어요."
+        draft = null
+        parkOnly = false
+        question = ""
+        step = Step.IDLE
+    }
+
     private fun skipSpot() = finishLogbook(if (parkOnly) "주차 위치 기록을 취소했어요." else "알겠어요. 운행일지만 저장했어요.")
 
     private fun answerWhereParked() {
@@ -1000,9 +1015,9 @@ class MainActivity : ComponentActivity() {
             GearState()
             Spacer(Modifier.weight(1f))
             // Organizing a trip (LOGBOOK) starts from the today tab, so it keeps that tab lit.
-            Tab("오늘", screen == Screen.HOME || screen == Screen.LOGBOOK) { screen = Screen.HOME }
-            Tab("운행일지", screen == Screen.RECORDS) { screen = Screen.RECORDS }
-            Tab("여행", screen == Screen.JOURNEY) { screen = Screen.JOURNEY }
+            Tab("오늘", screen == Screen.HOME || screen == Screen.LOGBOOK) { leaveFlow(); screen = Screen.HOME }
+            Tab("운행일지", screen == Screen.RECORDS) { leaveFlow(); screen = Screen.RECORDS }
+            Tab("여행", screen == Screen.JOURNEY) { leaveFlow(); screen = Screen.JOURNEY }
             Spacer(Modifier.width(8.dp))
             SettingsMenu()
         }
@@ -1024,7 +1039,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun SettingsMenu() {
         val on = screen == Screen.SETTINGS
-        IconButton(onClick = { screen = Screen.SETTINGS }, modifier = Modifier.size(56.dp)) {
+        IconButton(onClick = { leaveFlow(); screen = Screen.SETTINGS }, modifier = Modifier.size(56.dp)) {
             Icon(Icons.Filled.Settings, contentDescription = "설정", tint = if (on) Ui.Ink else Ui.Muted, modifier = Modifier.size(34.dp))
         }
     }
