@@ -41,8 +41,19 @@ object LogbookLink {
      * Payload before compression: `{"v":1,"m":"2026-11","t":[[startMinute,startKm×10,endKm×10,"C|B|P","arrival"],…]}`.
      * Distances are tenths of a km so the numbers stay integers.
      */
-    fun payload(trips: List<Trip>, month: YearMonth): String = buildString {
-        append("{\"v\":1,\"m\":\"").append(month).append("\",\"t\":[")
+    fun payload(trips: List<Trip>, month: YearMonth, profile: LogbookProfile = LogbookProfile()): String = buildString {
+        append("{\"v\":1,\"m\":\"").append(month).append("\",")
+        // The form header from settings; the phone page fills its 기본 정보 fields with it.
+        val fields = profile.fields()
+        if (fields.isNotEmpty()) {
+            append("\"p\":{")
+            fields.entries.forEachIndexed { index, (key, value) ->
+                if (index > 0) append(',')
+                append('"').append(key).append("\":\"").append(escape(value)).append('"')
+            }
+            append("},")
+        }
+        append("\"t\":[")
         trips.forEachIndexed { index, trip ->
             if (index > 0) append(',')
             append('[').append(trip.startedAt / 60_000).append(',')
@@ -54,8 +65,8 @@ object LogbookLink {
     }
 
     /** The link for [month]: raw-deflated payload in base64url after `#`. [base] can point at a test server. */
-    fun url(trips: List<Trip>, month: YearMonth, zone: ZoneId = ZoneId.systemDefault(), base: String = BASE_URL): String {
-        val bytes = payload(tripsIn(trips, month, zone), month).toByteArray(Charsets.UTF_8)
+    fun url(trips: List<Trip>, month: YearMonth, zone: ZoneId = ZoneId.systemDefault(), base: String = BASE_URL, profile: LogbookProfile = LogbookProfile()): String {
+        val bytes = payload(tripsIn(trips, month, zone), month, profile).toByteArray(Charsets.UTF_8)
         return base + "#" + Base64.getUrlEncoder().withoutPadding().encodeToString(deflate(bytes))
     }
 

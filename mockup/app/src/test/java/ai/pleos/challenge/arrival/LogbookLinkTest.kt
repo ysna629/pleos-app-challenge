@@ -32,6 +32,23 @@ class LogbookLinkTest {
     }
 
     @Test
+    fun payloadCarriesOnlyTheFilledProfileFields() {
+        val profile = LogbookProfile(company = "개척자들", plate = "12가 3456", name = "나윤수")
+        val payload = LogbookLink.payload(LogbookLink.tripsIn(trips, YearMonth.of(2026, 11), seoul), YearMonth.of(2026, 11), profile)
+        assertTrue(payload.contains("\"p\":{\"company\":\"개척자들\",\"plate\":\"12가 3456\",\"name\":\"나윤수\"}"))
+        assertTrue(!LogbookLink.payload(emptyList(), YearMonth.of(2026, 11)).contains("\"p\""))
+    }
+
+    @Test
+    fun profileRoundTripsThroughJsonAndBlanksAreDropped() {
+        val profile = LogbookProfile(bizNo = "123-45-67890", dept = " ")
+        val back = LogbookProfile.fromJson(profile.toJson())
+        assertEquals(mapOf("bizNo" to "123-45-67890"), back.fields())
+        assertEquals("", back.get("dept"))
+        assertEquals("쏘렌토", back.with("model", "쏘렌토").model)
+    }
+
+    @Test
     fun months_newestFirst() {
         assertEquals(listOf(YearMonth.of(2026, 11), YearMonth.of(2026, 10)), LogbookLink.months(trips, seoul))
     }
