@@ -955,7 +955,7 @@ class MainActivity : ComponentActivity() {
                                 onUpdate = ::updateJourneyStop,
                                 onVoiceNote = ::recordJourneyNote, recording = step == Step.ASK_JOURNEY_NOTE || step == Step.HEAR_JOURNEY_NOTE,
                                 partial = partial, feedback = journeyFeedback,
-                                viewerBase = intent.getStringExtra("viewer_url") ?: LogbookLink.BASE_URL,
+                                viewerBase = viewerBase(),
                                 exportMessage = exportMessage, onSaveCsv = ::saveJourneyCsv,
                                 onOpenExport = { exportMessage = "" }, busy = step != Step.IDLE,
                                 stopMapApp = stopMapApp,
@@ -1197,11 +1197,8 @@ class MainActivity : ComponentActivity() {
                     QuietButton("발자취 보기", Modifier.fillMaxWidth()) { journeyPreview = false; screen = Screen.JOURNEY }
                 }
             }
-            SharePanel(listOf("마지막 주차 위치 문자"), 0, {}) {
-                SmsShare(
-                    qr = { last?.smsQrText(phone, it) }, body = { last?.smsBody(it) }, hasLink = last?.mapLink() != null,
-                    empty = "주차 위치를 기록하면 QR이 나타나요.", canPick = false,
-                )
+            SharePanel(listOf("마지막 주차 위치"), 0, {}) {
+                RecordShare(last?.let { RecordLink.url(it, phone, mapApp, viewerBase()) }, last?.smsBody(mapApp), empty = "주차 위치를 기록하면 QR이 나타나요.")
             }
         }
     }
@@ -1252,22 +1249,26 @@ class MainActivity : ComponentActivity() {
      * [body] builds the SMS for a map app; the default app comes from settings and can be changed here for this
      * QR only. [canPick] false hides that choice.
      */
+    /**
+     * One record as a phone page QR. The page offers the map apps and a text message, so the driver picks there
+     * instead of the QR dropping straight into the SMS composer. [text] previews what the text message will say.
+     */
     @Composable
-    private fun SmsShare(qr: (MapApp) -> String?, body: (MapApp) -> String?, hasLink: Boolean, empty: String, canPick: Boolean = true) {
-        var pick by remember(mapApp) { mutableStateOf(mapApp) }
-        val ready = phone.count(Char::isDigit) >= 10
-        val text = body(pick)
-        QrPlate(
-            qr(pick).takeIf { ready }, "문자 보내기 QR 코드",
-            empty = if (text == null) empty else "설정에서 내 휴대폰 번호를 입력하면 QR이 나타나요.",
-        )
-        if (text != null && !ready) QuietButton("설정 열기") { beforeSettings = screen; screen = Screen.SETTINGS }
-        if (text != null) {
-            Note("카메라로 스캔하면 문자 앱이 열려요. 보내면 내 문자함에 남아요.")
-            if (hasLink && canPick) Segmented(MapApp.entries.map { it.label }, MapApp.entries.indexOf(pick)) { pick = MapApp.entries[it] }
-            Text(text, fontSize = Ui.Small, color = Ui.Ink, lineHeight = 28.sp, modifier = Modifier.fillMaxWidth().background(Ui.Raised, Ui.ControlShape).padding(16.dp))
+    private fun RecordShare(url: String?, text: String?, empty: String) {
+        QrPlate(url, "기록 페이지 QR 코드", empty = empty)
+        if (url != null) {
+            Note("카메라로 스캔하면 기록 페이지가 열려요. 거기서 지도 앱으로 열거나 문자로 보낼 수 있어요.")
+            if (phone.count(Char::isDigit) < 10) {
+                Note("설정에 내 번호를 넣어 두면 문자 받는 사람이 자동으로 채워져요.", color = Ui.Warn)
+                QuietButton("설정 열기") { beforeSettings = screen; screen = Screen.SETTINGS }
+            }
+            // The map link is a button on the page, so the preview shows only the words of the message.
+            if (text != null) Text(text.lines().filterNot { it.startsWith("http") }.joinToString("\n"), fontSize = Ui.Small, color = Ui.Ink, lineHeight = 28.sp, modifier = Modifier.fillMaxWidth().background(Ui.Raised, Ui.ControlShape).padding(16.dp))
         }
     }
+
+    /** e.g. --es viewer_url http://192.168.0.10:8765/ to try viewer/ from a laptop before it is published. */
+    private fun viewerBase(): String = intent.getStringExtra("viewer_url") ?: LogbookLink.BASE_URL
 
     @Composable
     private fun PhoneField() {
@@ -1473,14 +1474,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-            SharePanel(listOf("운행 문자", "월간 운행기록부"), share, { share = it }) {
+            SharePanel(listOf("운행 기록", "월간 운행기록부"), share, { share = it }) {
                 if (share == 1) MonthlyShare(month, inMonth)
                 else {
                     val trip = inMonth.getOrNull(selected)
-                    SmsShare(
-                        qr = { trip?.smsQrText(phone, it) }, body = { trip?.smsBody(it) }, hasLink = trip?.mapLink() != null,
-                        empty = "기록이 생기면 QR이 나타나요.",
-                    )
+                    RecordShare(trip?.let { RecordLink.url(it, phone, mapApp, viewerBase()) }, trip?.smsBody(mapApp), empty = "기록이 생기면 QR이 나타나요.")
                 }
             }
         }
@@ -1493,8 +1491,7 @@ class MainActivity : ComponentActivity() {
         if (inMonth.isEmpty()) return QrPlate(null, "월간 운행기록부 QR 코드", empty = "이 달에 기록이 생기면 QR이 나타나요.")
         val sum = LogbookLink.summary(inMonth)
         val url = remember(month, inMonth) {
-            // e.g. --es viewer_url http://192.168.0.10:8765/ to try viewer/ from a laptop before it is published
-            LogbookLink.url(trips, month, base = intent.getStringExtra("viewer_url") ?: LogbookLink.BASE_URL)
+            LogbookLink.url(trips, month, base = viewerBase())
                 .also { Log.i(TAG, "monthly ${it.length} chars $it") }
         }
         QrPlate(url, "월간 운행기록부 QR 코드", empty = "QR을 만들지 못했어요.")
