@@ -137,7 +137,9 @@ class MainActivity : ComponentActivity() {
     private var showManual by mutableStateOf(false)
     private var notice by mutableStateOf("")
     private var phone by mutableStateOf("")
-    private var mapApp by mutableStateOf(MapApp.GOOGLE)
+    /** One map choice for everything: the record page's first button and the footprint map QR. */
+    private val mapApp: MapApp get() = MapApp.valueOf(stopMapApp.name)
+    private var profile by mutableStateOf(LogbookProfile())
     private var consented by mutableStateOf(false)
     private var declined by mutableStateOf(false)
     private var confirmWithdraw by mutableStateOf(false)
@@ -212,7 +214,7 @@ class MainActivity : ComponentActivity() {
         segments.addAll(segmentStore.load())
         parkingNotes.addAll(store.loadParking())
         phone = store.phone
-        mapApp = store.mapApp
+        profile = store.profile
         consentStore = ConsentStore(this)
         journeyStore = JourneyStore(this)
         journeys.addAll(JourneyDays.keepStarred(journeyStore.load().map { it.resume() }))
@@ -316,6 +318,7 @@ class MainActivity : ComponentActivity() {
         journeyShareRequest = null
         exportMessage = ""
         phone = ""
+        profile = LogbookProfile()
         draft = null
         step = Step.IDLE
         showBanner = false
@@ -1083,18 +1086,24 @@ class MainActivity : ComponentActivity() {
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
             Panel(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
                 ScreenTitle("설정")
-                Text("내 설정", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
+                // Everything the phone pages fill in from the car, in one place; every field may stay blank.
+                Text("기본 정보", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
                 Spacer(Modifier.height(12.dp))
                 PhoneField()
-                Note("문자 QR의 받는 사람으로만 써요.", modifier = Modifier.padding(top = 6.dp))
-                Spacer(Modifier.height(20.dp))
-                Note("주차 위치 문자의 지도 링크")
-                Spacer(Modifier.height(8.dp))
-                Segmented(MapApp.entries.map { it.label }, MapApp.entries.indexOf(mapApp)) { mapApp = MapApp.entries[it]; store.mapApp = mapApp }
-                Spacer(Modifier.height(20.dp))
-                Note("발자취 장소를 여는 지도 앱")
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
+                LogbookProfile.LABELS.chunked(2).forEach { pair ->
+                    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        pair.forEach { (key, label) -> ProfileField(key, label, Modifier.weight(1f)) }
+                    }
+                }
+                Note("휴대폰 번호는 기록 페이지에서 문자를 보낼 때 받는 사람으로 써요. 나머지는 월간 운행기록부 양식에 사용돼요. 비워 두면 빈칸으로 나와요. 모두 이 차량 안에만 저장돼요.")
+            }
+            Panel(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+                Spacer(Modifier.height(50.dp))
+                Text("지도 앱", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
+                Spacer(Modifier.height(12.dp))
                 Segmented(StopMapApp.entries.map { it.label }, StopMapApp.entries.indexOf(stopMapApp)) { stopMapApp = StopMapApp.entries[it]; journeyStore.stopMapApp = stopMapApp }
+                Note("기록 페이지와 발자취의 장소 지도 QR이 먼저 여는 지도예요. 페이지에서는 다른 지도도 고를 수 있어요.", modifier = Modifier.padding(top = 8.dp))
                 Rule(Modifier.padding(vertical = 28.dp))
                 Text("개인정보", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
                 Spacer(Modifier.height(12.dp))
@@ -1116,8 +1125,20 @@ class MainActivity : ComponentActivity() {
                 Fact("버전", BuildConfig.VERSION_NAME)
                 Fact("보관", "모든 기록은 이 차량 안에만 저장돼요")
             }
-            Spacer(Modifier.width(Ui.ShareWidth))
         }
+    }
+
+    @Composable
+    private fun ProfileField(key: String, label: String, modifier: Modifier) {
+        OutlinedTextField(
+            value = profile.get(key),
+            onValueChange = { value -> profile = profile.with(key, value.take(40)); store.profile = profile },
+            label = { Text(label) },
+            enabled = parked == true,
+            singleLine = true,
+            textStyle = TextStyle(fontSize = Ui.Body),
+            modifier = modifier,
+        )
     }
 
     /** The top-left arrow: settings returns to where it was opened, the organizing flow ends, everything else goes to 오늘. */
@@ -1510,8 +1531,8 @@ class MainActivity : ComponentActivity() {
         Text("${month.year}년 ${month.monthValue}월", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
         if (inMonth.isEmpty()) return QrPlate(null, "월간 운행기록부 QR 코드", empty = "이 달에 기록이 생기면 QR이 나타나요.")
         val sum = LogbookLink.summary(inMonth)
-        val url = remember(month, inMonth) {
-            LogbookLink.url(trips, month, base = viewerBase())
+        val url = remember(month, inMonth, profile) {
+            LogbookLink.url(trips, month, base = viewerBase(), profile = profile)
                 .also { Log.i(TAG, "monthly ${it.length} chars $it") }
         }
         QrPlate(url, "월간 운행기록부 QR 코드", empty = "QR을 만들지 못했어요.")

@@ -83,7 +83,7 @@
     </section>
 
     <section>
-      <h2>기본 정보 <span class="no-print">(이 휴대폰에만 저장돼요)</span></h2>
+      <h2>기본 정보 <span class="no-print">(차량 설정 값으로 채워져요. 여기서 고친 값은 이 휴대폰에만 남아요)</span></h2>
       <div class="fields" id="fields"></div>
     </section>
 
@@ -242,6 +242,10 @@
     } catch {
       $("period").innerHTML = '<span class="error">기록을 읽지 못했어요. QR 코드를 다시 스캔하거나 브라우저를 최신으로 업데이트해 주세요.</span>';
       return;
+    }
+    // The car's settings fill the form header; a value typed here earlier stays only where the car left a blank.
+    if (data.p && typeof data.p === "object") {
+      FIELDS.forEach(([key]) => { if (typeof data.p[key] === "string" && data.p[key]) storage.set(key, data.p[key].slice(0, 40)); });
     }
     const trips = toTrips(data);
     let totals = render(data.m, trips);
