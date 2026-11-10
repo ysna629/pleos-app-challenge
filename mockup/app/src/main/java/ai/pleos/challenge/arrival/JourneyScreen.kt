@@ -34,11 +34,12 @@ import kotlin.math.cos
 
 /**
  * The journey tab: where the car stopped today, the route it took, and the same phone column as every other tab.
- * Sample changes remain in Compose memory only.
+ * Only today is shown here; starred places from earlier days live on the places tab. Sample changes remain in
+ * Compose memory only.
  */
 @Composable
 fun JourneyScreen(
-    journeys: List<Journey>, parked: Boolean?, preview: Boolean, onPreviewChange: (Boolean) -> Unit,
+    today: Journey?, parked: Boolean?, preview: Boolean, onPreviewChange: (Boolean) -> Unit,
     shareRequest: JourneyShareMode?, onShareRequestHandled: () -> Unit,
     onUpdate: (String, String, (JourneyStop) -> JourneyStop) -> Unit,
     onVoiceNote: (String, String) -> Unit,
@@ -49,8 +50,7 @@ fun JourneyScreen(
     stopMapApp: StopMapApp,
 ) {
     var sample by remember { mutableStateOf(sampleJourney()) }
-    var selectedJourney by remember { mutableStateOf<String?>(null) }
-    val journey = if (preview) sample else journeys.firstOrNull { it.id == selectedJourney } ?: journeys.firstOrNull()
+    val journey = if (preview) sample else today
     var selectedStopId by remember(journey?.id, preview) { mutableStateOf<String?>(null) }
     val stop = journey?.stops?.firstOrNull { it.id == selectedStopId } ?: journey?.stops?.lastOrNull()
     val canEdit = parked == true && !busy
@@ -72,9 +72,9 @@ fun JourneyScreen(
             if (journey == null) {
                 Panel(Modifier.weight(1f).fillMaxHeight()) {
                     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                        Heading("아직 들른 곳이 없어요")
+                        Heading("오늘은 아직 들른 곳이 없어요")
                         Spacer(Modifier.height(12.dp))
-                        Note("주행하고 주차하면 들른 곳과 이동 경로가 여기에 모여요.")
+                        Note("주행하고 주차하면 오늘 들른 곳과 이동 경로가 여기에 모여요. 별표한 곳은 다시 갈 곳에 남아요.")
                         Spacer(Modifier.height(24.dp))
                         QuietButton("예시 여행 보기") { onPreviewChange(true) }
                     }
@@ -86,10 +86,6 @@ fun JourneyScreen(
                         preview -> Note("예시 여행이에요. 실제 기록에는 저장되지 않아요.", color = Ui.Warn)
                         parked == null -> Note("기어를 확인하고 있어요. 주차(P)가 확인되면 고치거나 보낼 수 있어요.", color = Ui.Warn)
                         else -> Note(if (journey.endedAt == null) "기록하고 있어요" else "기록을 마쳤어요")
-                    }
-                    if (!preview && journeys.size > 1) {
-                        Spacer(Modifier.height(12.dp))
-                        Segmented(journeys.map { day(it.startedAt) }, journeys.indexOfFirst { it.id == journey.id }) { selectedJourney = journeys[it].id }
                     }
                     Spacer(Modifier.height(12.dp))
                     LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -119,6 +115,7 @@ fun JourneyScreen(
                             }
                         }
                         if (journey.stops.isEmpty()) item { Note("주차(P)하면 첫 방문이 여기에 생겨요.", modifier = Modifier.padding(vertical = 20.dp)) }
+                        else item { Note("별표한 곳은 날이 지나도 다시 갈 곳 탭에 남아요. 나머지는 오늘만 보여요.", modifier = Modifier.padding(top = 12.dp)) }
                     }
                     if (stop != null) {
                         Rule(Modifier.padding(vertical = 14.dp))
@@ -337,7 +334,6 @@ private fun RouteOverview(journey: Journey, selected: String?, onSelect: (String
 }
 
 private fun clock(at: Long): String = SimpleDateFormat("HH:mm", Locale.KOREA).format(Date(at))
-private fun day(at: Long): String = SimpleDateFormat("M월 d일", Locale.KOREA).format(Date(at))
 
 private fun sampleJourney(): Journey {
     val start = java.time.LocalDate.now().atTime(9, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()

@@ -94,7 +94,7 @@ import kotlinx.coroutines.withContext
  */
 class MainActivity : ComponentActivity() {
 
-    private enum class Screen { HOME, LOGBOOK, RECORDS, JOURNEY, SETTINGS }
+    private enum class Screen { HOME, LOGBOOK, RECORDS, JOURNEY, PLACES, SETTINGS }
 
     /** ASK_* speaks a question, HEAR_* listens for the answer, CHOOSE_* waits for a tap after voice failed. */
     private enum class Step {
@@ -209,7 +209,7 @@ class MainActivity : ComponentActivity() {
         mapApp = store.mapApp
         consentStore = ConsentStore(this)
         journeyStore = JourneyStore(this)
-        journeys.addAll(journeyStore.load().map { it.resume() })
+        journeys.addAll(JourneyDays.keepStarred(journeyStore.load().map { it.resume() }))
         stopMapApp = journeyStore.stopMapApp
         journeyPreview = intent.getBooleanExtra("journey_demo", false)
         if (journeyPreview) screen = Screen.JOURNEY
@@ -453,7 +453,7 @@ class MainActivity : ComponentActivity() {
 
     private fun captureJourneyGear(isParked: Boolean, at: Long) {
         if (!running || !consented) return
-        val updated = JourneyDays.onGear(journeys.toList(), isParked, at, car.journeyFix)
+        val updated = JourneyDays.keepStarred(JourneyDays.onGear(journeys.toList(), isParked, at, car.journeyFix))
         if (updated != journeys.toList()) {
             journeys.clear()
             journeys.addAll(updated)
@@ -522,6 +522,9 @@ class MainActivity : ComponentActivity() {
         val index = journeys.indexOfFirst { it.id == journeyId }
         if (index < 0) return
         journeys[index] = journeys[index].updateStop(stopId, change)
+        // Unstarring the last place of a past day leaves nothing worth keeping of that day.
+        val kept = JourneyDays.keepStarred(journeys.toList())
+        if (kept != journeys.toList()) { journeys.clear(); journeys.addAll(kept) }
         journeyStore.save(journeys)
     }
 
@@ -636,7 +639,7 @@ class MainActivity : ComponentActivity() {
                 Commands.Intent.JOURNEY -> { screen = Screen.JOURNEY; step = Step.IDLE; journeyPreview = false }
                 Commands.Intent.SHOW_JOURNEY_QR, Commands.Intent.EXPORT_JOURNEY_CSV -> {
                     if (parked != true) say(Step.IDLE, "정차한 뒤에 기록을 공유할 수 있어요.")
-                    else if (journeys.isEmpty() && !journeyPreview) say(Step.IDLE, "아직 경유지 기록이 없어요. 이동과 주차를 확인하면 자동으로 기록해요.")
+                    else if (JourneyDays.today(journeys, System.currentTimeMillis()) == null && !journeyPreview) say(Step.IDLE, "오늘은 아직 경유지 기록이 없어요. 이동과 주차를 확인하면 자동으로 기록해요.")
                     else {
                         voice.stopListening()
                         step = Step.IDLE
@@ -946,8 +949,12 @@ class MainActivity : ComponentActivity() {
                             Screen.LOGBOOK -> LogbookScreen()
                             Screen.RECORDS -> RecordsScreen()
                             Screen.SETTINGS -> SettingsScreen()
+                            Screen.PLACES -> PlacesScreen(
+                                places = savedPlaces(journeys), parked = parked, busy = step != Step.IDLE,
+                                onUpdate = ::updateJourneyStop, stopMapApp = stopMapApp,
+                            )
                             Screen.JOURNEY -> JourneyScreen(
-                                journeys = journeys, parked = parked, preview = journeyPreview, onPreviewChange = { journeyPreview = it },
+                                today = JourneyDays.today(journeys, System.currentTimeMillis()), parked = parked, preview = journeyPreview, onPreviewChange = { journeyPreview = it },
                                 shareRequest = journeyShareRequest, onShareRequestHandled = { journeyShareRequest = null },
                                 onUpdate = ::updateJourneyStop,
                                 onVoiceNote = ::recordJourneyNote, recording = step == Step.ASK_JOURNEY_NOTE || step == Step.HEAR_JOURNEY_NOTE,
@@ -1028,6 +1035,7 @@ class MainActivity : ComponentActivity() {
             Tab("오늘", screen == Screen.HOME || screen == Screen.LOGBOOK) { leaveFlow(); screen = Screen.HOME }
             Tab("운행일지", screen == Screen.RECORDS) { leaveFlow(); screen = Screen.RECORDS }
             Tab("여행", screen == Screen.JOURNEY) { leaveFlow(); screen = Screen.JOURNEY }
+            Tab("다시 갈 곳", screen == Screen.PLACES) { leaveFlow(); screen = Screen.PLACES }
             Spacer(Modifier.width(8.dp))
             SettingsMenu()
         }
@@ -1181,17 +1189,20 @@ class MainActivity : ComponentActivity() {
                     QuietButton("기록하기", Modifier.fillMaxWidth(), enabled = step == Step.IDLE && parked == true) { startParkOnly() }
                 }
                 Rule()
-                val journey = journeys.firstOrNull { it.endedAt == null }
+                val journey = JourneyDays.today(journeys, System.currentTimeMillis())
                 SummaryRow(
                     title = "여행",
                     value = "${journey?.stops?.size ?: 0}곳",
                     caption = "오늘 들른 곳",
                     details = listOf(
-                        String.format(Locale.KOREA, "이동 %.1f km", journey?.distanceKm ?: 0.0),
-                        "다시 갈 곳 ${journey?.stops?.count { it.favorite } ?: 0}곳",
+                        String.format(Locale.KOREA, "오늘 이동 %.1f km", journey?.distanceKm ?: 0.0),
+                        "다시 갈 곳 ${savedPlaces(journeys).size}곳",
                     ),
                 ) {
-                    QuietButton("여행 보기", Modifier.fillMaxWidth()) { journeyPreview = false; screen = Screen.JOURNEY }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        QuietButton("여행 보기", Modifier.fillMaxWidth()) { journeyPreview = false; screen = Screen.JOURNEY }
+                        QuietButton("다시 갈 곳", Modifier.fillMaxWidth()) { screen = Screen.PLACES }
+                    }
                 }
             }
             SharePanel(listOf("마지막 주차 위치 문자"), 0, {}) {
@@ -1235,7 +1246,7 @@ class MainActivity : ComponentActivity() {
                 when {
                     step == Step.HEAR_COMMAND -> Heading(partial.ifBlank { "듣고 있어요" })
                     reply.isNotBlank() -> Heading(reply)
-                    screen == Screen.JOURNEY -> Text("\"여기 기억해 줘\"   \"휴대폰으로 보여 줘\"   \"엑셀로 내보내 줘\"", fontSize = Ui.Body, color = Ui.Muted)
+                    screen == Screen.JOURNEY || screen == Screen.PLACES -> Text("\"여기 기억해 줘\"   \"휴대폰으로 보여 줘\"   \"엑셀로 내보내 줘\"", fontSize = Ui.Body, color = Ui.Muted)
                     else -> Text("\"운행일지 정리해줘\"   \"주차 위치 기록해줘\"   \"주차 어디 했지?\"", fontSize = Ui.Body, color = Ui.Muted)
                 }
                 if (heard.isNotBlank() && step != Step.HEAR_COMMAND) Note("들은 말: \"$heard\"")
@@ -1418,13 +1429,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** The logbook one month at a time, the unit it is submitted in; the monthly QR follows the same month. */
     @Composable
     private fun RecordsScreen() {
-        var selected by remember { mutableStateOf(0) }
+        // This month is always offered, even before its first trip, so the table opens on it.
+        val months = remember(trips.size) { (LogbookLink.months(trips) + java.time.YearMonth.now()).distinct().sortedDescending() }
+        var monthIndex by remember { mutableStateOf(0) }
+        val month = months[monthIndex.coerceIn(months.indices)]
+        val inMonth = trips.filter { LogbookLink.monthOf(it) == month }
+        var selected by remember(month) { mutableStateOf(0) }
         var share by remember { mutableStateOf(0) }
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
             Panel(Modifier.weight(1f).fillMaxHeight()) {
-                Heading("업무용승용차 운행기록부")
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Heading("업무용승용차 운행기록부", Modifier.weight(1f))
+                    IconButton(onClick = { monthIndex++ }, enabled = monthIndex < months.lastIndex, modifier = Modifier.size(52.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "이전 달", modifier = Modifier.size(36.dp))
+                    }
+                    Text("${month.year}년 ${month.monthValue}월", fontSize = Ui.Heading, fontWeight = FontWeight.Bold, color = Ui.Ink, textAlign = TextAlign.Center, modifier = Modifier.width(190.dp))
+                    IconButton(onClick = { monthIndex-- }, enabled = monthIndex > 0, modifier = Modifier.size(52.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "다음 달", modifier = Modifier.size(36.dp))
+                    }
+                }
                 Row(Modifier.padding(top = 12.dp)) {
                     Cell("사용일자", 1.3f, header = true)
                     Cell("주행 전", 1f, header = true)
@@ -1434,10 +1460,13 @@ class MainActivity : ComponentActivity() {
                     Cell("주차 위치", 1.3f, header = true)
                 }
                 Rule()
-                if (trips.isEmpty()) Note("아직 기록이 없어요. 주행을 마치고 \"운행일지 정리해줘\"라고 말해 보세요.", modifier = Modifier.padding(top = 20.dp))
+                if (inMonth.isEmpty()) Note(
+                    if (trips.isEmpty()) "아직 기록이 없어요. 주행을 마치고 \"운행일지 정리해줘\"라고 말해 보세요." else "이 달에는 기록이 없어요.",
+                    modifier = Modifier.padding(top = 20.dp),
+                )
                 LazyColumn {
-                    items(trips.size) { index ->
-                        val trip = trips[index]
+                    items(inMonth.size) { index ->
+                        val trip = inMonth[index]
                         Row(
                             Modifier.clip(RoundedCornerShape(8.dp)).background(if (index == selected) Ui.Raised else Color.Transparent)
                                 .clickable { selected = index; share = 0 },
@@ -1453,9 +1482,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
             SharePanel(listOf("운행 문자", "월간 운행기록부"), share, { share = it }) {
-                if (share == 1) MonthlyShare()
+                if (share == 1) MonthlyShare(month, inMonth)
                 else {
-                    val trip = trips.getOrNull(selected)
+                    val trip = inMonth.getOrNull(selected)
                     SmsShare(
                         qr = { trip?.smsQrText(phone, it) }, body = { trip?.smsBody(it) }, hasLink = trip?.mapLink() != null,
                         empty = "기록이 생기면 QR이 나타나요.",
@@ -1465,23 +1494,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** One month as a link QR: the phone opens the NTS table and can save it as a spreadsheet. */
+    /** The month shown in the table as a link QR: the phone opens the NTS table and can save it as a spreadsheet. */
     @Composable
-    private fun MonthlyShare() {
-        val months = LogbookLink.months(trips)
-        if (months.isEmpty()) return QrPlate(null, "월간 운행기록부 QR 코드", empty = "기록이 생기면 QR이 나타나요.")
-        var index by remember { mutableStateOf(0) }
-        val month = months[index.coerceIn(months.indices)]
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { index++ }, enabled = index < months.lastIndex, modifier = Modifier.size(52.dp)) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "이전 달", modifier = Modifier.size(36.dp))
-            }
-            Text("${month.year}년 ${month.monthValue}월", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-            IconButton(onClick = { index-- }, enabled = index > 0, modifier = Modifier.size(52.dp)) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "다음 달", modifier = Modifier.size(36.dp))
-            }
-        }
-        val inMonth = LogbookLink.tripsIn(trips, month)
+    private fun MonthlyShare(month: java.time.YearMonth, inMonth: List<Trip>) {
+        Text("${month.year}년 ${month.monthValue}월", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
+        if (inMonth.isEmpty()) return QrPlate(null, "월간 운행기록부 QR 코드", empty = "이 달에 기록이 생기면 QR이 나타나요.")
         val sum = LogbookLink.summary(inMonth)
         val url = remember(month, inMonth) {
             // e.g. --es viewer_url http://192.168.0.10:8765/ to try viewer/ from a laptop before it is published
