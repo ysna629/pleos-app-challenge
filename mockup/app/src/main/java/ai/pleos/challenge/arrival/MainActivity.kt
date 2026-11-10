@@ -1498,7 +1498,7 @@ class MainActivity : ComponentActivity() {
                 .also { Log.i(TAG, "monthly ${it.length} chars $it") }
         }
         QrPlate(url, "월간 운행기록부 QR 코드", empty = "QR을 만들지 못했어요.")
-        Note("카메라로 스캔하면 국세청 운행기록부 양식으로 열려요. 엑셀로 받거나 인쇄할 수 있어요.")
+        Note("카메라로 스캔하면 이 달의 운행기록부가 열려요. 엑셀로 받을 수 있어요.")
         Column(Modifier.fillMaxWidth().background(Ui.Raised, Ui.ControlShape).padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("${inMonth.size}건, 총 ${km(sum.totalKm)}", fontSize = Ui.Small, color = Ui.Ink)
             Text("업무용 ${km(sum.workKm)}", fontSize = Ui.Small, color = Ui.Ink)
