@@ -133,13 +133,15 @@ node --test viewer/journey-export.test.mjs   # 웹 페이지 테스트 8개
 
 ## APK
 
-릴리스 APK는 `apk/` 폴더에 둡니다. 서명 키는 저장소에 포함하지 않습니다.
+| 항목 | 내용 |
+|---|---|
+| 파일 | [`apk/개척자들_Route94_release.apk`](apk/개척자들_Route94_release.apk) |
+| 버전 | 1.0 (versionCode 1), 패키지 `ai.pleos.challenge.arrival` |
+| 빌드 | release, APK Signature Scheme v2 서명. 서명 키와 카카오 API 키는 저장소에 포함하지 않습니다. |
 
-```
-apk/개척자들_Route94_release.apk
-```
+설치: `adb install -r --user 10 apk/개척자들_Route94_release.apk` (Pleos 에뮬레이터는 사용자 10에서 앱이 실행됩니다.) 디버그 빌드가 이미 설치돼 있으면 서명이 달라 먼저 `adb uninstall ai.pleos.challenge.arrival`이 필요합니다.
 
-설치: `adb install -r --user 10 apk/<파일명>.apk` (Pleos 에뮬레이터는 사용자 10에서 앱이 실행됩니다.)
+직접 빌드하려면 `mockup/`에서 `./gradlew assembleRelease` (서명 정보는 로컬 Gradle 속성 `route94StoreFile` 등 4개, 없으면 서명 없는 APK가 나옵니다).
 
 ## 테스트 환경
 

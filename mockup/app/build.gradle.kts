@@ -13,7 +13,29 @@ android {
         minSdk = 28
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1-mockup"
+        versionName = "1.0"
+    }
+
+    // Release signing comes from the local Gradle properties (route94StoreFile / route94StorePassword /
+    // route94KeyAlias / route94KeyPassword), so the keystore never enters the repository. Without them the
+    // release build is unsigned, which is fine for CI compiles but not for the submitted APK.
+    val storePath = providers.gradleProperty("route94StoreFile").orNull
+    if (storePath != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(storePath)
+                storePassword = providers.gradleProperty("route94StorePassword").orNull
+                keyAlias = providers.gradleProperty("route94KeyAlias").orNull
+                keyPassword = providers.gradleProperty("route94KeyPassword").orNull
+            }
+        }
+    }
+    buildTypes {
+        release {
+            // No shrinking: the Pleos SDKs talk to system services over AIDL and reflection-free code is small anyway.
+            isMinifyEnabled = false
+            if (storePath != null) signingConfig = signingConfigs.getByName("release")
+        }
     }
 
     // CarPropertyManager for gear changes (GEAR_SELECTION)

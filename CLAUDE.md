@@ -7,6 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 현대자동차그룹 "차량용 앱 개발 공모전 — Code your App into Pleos App Market" 출품 프로젝트.
 이 파일은 이전 세션(2026-10-23)에서 조사한 내용을 이어가기 위한 핸드오프 문서다.
 
+> **릴리스 APK (2026-11-10)**: `apk/개척자들_Route94_release.apk`(1.0, v2 서명, 카카오 키 포함). 서명 키는 `~/.android/route94-release.jks`(alias `route94`), 비밀번호는 로컬 Gradle 속성 `route94*` 4개 — **저장소 밖, 팀 공유 드라이브에 백업 필요**(잃으면 같은 서명으로 업데이트 불가). `build.gradle.kts`는 그 속성이 있을 때만 release 서명. 릴리스는 `clean assembleRelease`로(카카오 키 인라인 문제). 에뮬레이터에 release를 깔면 디버그와 서명이 달라 `installDebug` 전에 `adb uninstall` 필요(기록 초기화됨).
+
 > **현재 상태 (2026-11-01)**: 아이디어 확정(운행일지 + 주차 위치 음성 메모, 아래 "팀 회의 결과"). 기술 검증 완료, `mockup/`에 동작하는 목업 앱 있음. **앱 이름 Route94(2026-11-10 확정, 미국 Route 66에서 따옴), 팀명 개척자들.** 이전 이름 "도착노트". 첫 커밋 완료(`sample/`·빌드 산출물은 `.gitignore`로 제외). 다음: 실사용 테스트 → 제출 준비(앱 이름·팀명, 기획서, 시연 영상, README·릴리스 APK).
 
 ## 팀 / 진행 방식
