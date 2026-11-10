@@ -1434,7 +1434,7 @@ class MainActivity : ComponentActivity() {
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
             Panel(Modifier.weight(1f).fillMaxHeight()) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Heading("업무용승용차 운행기록부", Modifier.weight(1f))
+                    Heading("운행기록부", Modifier.weight(1f))
                     IconButton(onClick = { monthIndex++ }, enabled = monthIndex < months.lastIndex, modifier = Modifier.size(52.dp)) {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "이전 달", modifier = Modifier.size(36.dp))
                     }
