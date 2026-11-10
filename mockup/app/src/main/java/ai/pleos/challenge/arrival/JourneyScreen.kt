@@ -104,7 +104,18 @@ fun JourneyScreen(
                                     Text(s.name.ifBlank { s.address.ifBlank { "이름 없는 곳" } }, color = Ui.Ink, fontSize = Ui.Body, maxLines = 1)
                                     Note("${clock(s.arrivedAt)}, ${stay(s, journey)}")
                                 }
-                                if (s.favorite) Icon(Icons.Filled.Star, contentDescription = "다시 갈 곳", tint = Ui.Star, modifier = Modifier.size(30.dp))
+                                // The star is on every row: grey until tapped, gold when it is a place to come back to.
+                                IconButton(
+                                    onClick = {
+                                        if (canEdit) {
+                                            if (preview) sample = sample.updateStop(s.id) { it.copy(favorite = !it.favorite) }
+                                            else onUpdate(journey.id, s.id) { it.copy(favorite = !it.favorite) }
+                                        }
+                                    },
+                                    modifier = Modifier.size(48.dp),
+                                ) {
+                                    Icon(Icons.Filled.Star, contentDescription = if (s.favorite) "다시 갈 곳" else "다시 갈 곳으로 표시", tint = if (s.favorite) Ui.Star else Ui.Line, modifier = Modifier.size(32.dp))
+                                }
                             }
                         }
                         if (journey.stops.isEmpty()) item { Note("주차(P)하면 첫 방문이 여기에 생겨요.", modifier = Modifier.padding(vertical = 20.dp)) }

@@ -39,6 +39,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Settings
@@ -1057,8 +1058,8 @@ class MainActivity : ComponentActivity() {
         var showConsent by remember { mutableStateOf(false) }
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
             Panel(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
-                Heading("설정")
-                Spacer(Modifier.height(24.dp))
+                BackHeader("설정") { screen = beforeSettings }
+                Spacer(Modifier.height(12.dp))
                 Text("내 설정", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
                 Spacer(Modifier.height(12.dp))
                 PhoneField()
@@ -1096,6 +1097,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Title row with a back arrow for screens that are not tabs: settings and the organizing flow. */
+    @Composable
+    private fun BackHeader(title: String, onBack: () -> Unit) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.size(52.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로", tint = Ui.Ink, modifier = Modifier.size(34.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            Heading(title)
+        }
+    }
+
     @Composable
     private fun GearState() {
         val label = when (parked) {
@@ -1113,8 +1126,8 @@ class MainActivity : ComponentActivity() {
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxWidth().padding(top = 16.dp).background(Ui.Raised, Ui.Shape).padding(horizontal = 24.dp, vertical = 14.dp),
         ) {
-            Text("운행일지를 정리할까요?", fontSize = Ui.Heading, fontWeight = FontWeight.Bold, color = Ui.Ink, modifier = Modifier.weight(1f))
-            PrimaryButton("정리하기") { startLogbook() }
+            Text("운행을 기록할까요?", fontSize = Ui.Heading, fontWeight = FontWeight.Bold, color = Ui.Ink, modifier = Modifier.weight(1f))
+            PrimaryButton("기록하기") { startLogbook() }
             QuietButton("닫기") { showBanner = false }
         }
     }
@@ -1147,8 +1160,8 @@ class MainActivity : ComponentActivity() {
                         "계기판 ${odometer?.let(::km) ?: "읽는 중"}",
                     ),
                 ) {
-                    if (pending != null) PrimaryButton("정리하기", enabled = step == Step.IDLE && parked == true) { startLogbook() }
-                    else QuietButton("기록 보기") { screen = Screen.RECORDS }
+                    if (pending != null) PrimaryButton("기록하기", enabled = step == Step.IDLE && parked == true) { startLogbook() }
+                    else QuietButton("운행일지 보기") { screen = Screen.RECORDS }
                 }
                 Rule()
                 SummaryRow(
@@ -1267,9 +1280,11 @@ class MainActivity : ComponentActivity() {
     private fun LogbookScreen() {
         if (parkOnly) return ParkOnlyScreen()
         val trip = draft ?: return HomeScreen()
+        Column {
+        BackHeader("운행 기록") { leaveFlow(); screen = Screen.HOME }
         Row(horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
             Panel(Modifier.weight(0.8f)) {
-                Heading("정리할 운행")
+                Heading("기록한 운행")
                 Text("총 ${km(trip.distanceKm)}", fontSize = Ui.Value, fontWeight = FontWeight.Bold, color = Ui.Ink)
                 Spacer(Modifier.height(12.dp))
                 Fact("출발", "${formatDate(trip.startedAt)}  ${trip.startAddress.ifBlank { "주소 없음" }}")
@@ -1288,10 +1303,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        }
     }
 
     @Composable
     private fun ParkOnlyScreen() {
+        Column {
+        BackHeader("주차 위치 기록") { leaveFlow(); screen = Screen.HOME }
         Row(horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
             Panel(Modifier.weight(0.8f)) {
                 Heading("주차 위치만 기록")
@@ -1303,6 +1321,7 @@ class MainActivity : ComponentActivity() {
                 Note("운행일지는 그대로 둬요. 나중에 \"운행일지 정리해줘\"로 따로 정리할 수 있어요.")
             }
             AssistantPanel { SpotPicker() }
+        }
         }
     }
 
