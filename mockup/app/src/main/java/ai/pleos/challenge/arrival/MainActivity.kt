@@ -94,7 +94,7 @@ import kotlinx.coroutines.withContext
  */
 class MainActivity : ComponentActivity() {
 
-    private enum class Screen { HOME, LOGBOOK, RECORDS, JOURNEY, PLACES, SETTINGS }
+    private enum class Screen { HOME, LOGBOOK, RECORDS, JOURNEY, SETTINGS }
 
     /** ASK_* speaks a question, HEAR_* listens for the answer, CHOOSE_* waits for a tap after voice failed. */
     private enum class Step {
@@ -949,12 +949,8 @@ class MainActivity : ComponentActivity() {
                             Screen.LOGBOOK -> LogbookScreen()
                             Screen.RECORDS -> RecordsScreen()
                             Screen.SETTINGS -> SettingsScreen()
-                            Screen.PLACES -> PlacesScreen(
-                                places = savedPlaces(journeys), parked = parked, busy = step != Step.IDLE,
-                                onUpdate = ::updateJourneyStop, stopMapApp = stopMapApp,
-                            )
                             Screen.JOURNEY -> JourneyScreen(
-                                today = JourneyDays.today(journeys, System.currentTimeMillis()), parked = parked, preview = journeyPreview, onPreviewChange = { journeyPreview = it },
+                                today = JourneyDays.today(journeys, System.currentTimeMillis()), places = savedPlaces(journeys), parked = parked, preview = journeyPreview, onPreviewChange = { journeyPreview = it },
                                 shareRequest = journeyShareRequest, onShareRequestHandled = { journeyShareRequest = null },
                                 onUpdate = ::updateJourneyStop,
                                 onVoiceNote = ::recordJourneyNote, recording = step == Step.ASK_JOURNEY_NOTE || step == Step.HEAR_JOURNEY_NOTE,
@@ -1035,7 +1031,6 @@ class MainActivity : ComponentActivity() {
             Tab("오늘", screen == Screen.HOME || screen == Screen.LOGBOOK) { leaveFlow(); screen = Screen.HOME }
             Tab("운행일지", screen == Screen.RECORDS) { leaveFlow(); screen = Screen.RECORDS }
             Tab("여행", screen == Screen.JOURNEY) { leaveFlow(); screen = Screen.JOURNEY }
-            Tab("다시 갈 곳", screen == Screen.PLACES) { leaveFlow(); screen = Screen.PLACES }
             Spacer(Modifier.width(8.dp))
             SettingsMenu()
         }
@@ -1199,10 +1194,7 @@ class MainActivity : ComponentActivity() {
                         "다시 갈 곳 ${savedPlaces(journeys).size}곳",
                     ),
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        QuietButton("여행 보기", Modifier.fillMaxWidth()) { journeyPreview = false; screen = Screen.JOURNEY }
-                        QuietButton("다시 갈 곳", Modifier.fillMaxWidth()) { screen = Screen.PLACES }
-                    }
+                    QuietButton("여행 보기", Modifier.fillMaxWidth()) { journeyPreview = false; screen = Screen.JOURNEY }
                 }
             }
             SharePanel(listOf("마지막 주차 위치 문자"), 0, {}) {
@@ -1246,7 +1238,7 @@ class MainActivity : ComponentActivity() {
                 when {
                     step == Step.HEAR_COMMAND -> Heading(partial.ifBlank { "듣고 있어요" })
                     reply.isNotBlank() -> Heading(reply)
-                    screen == Screen.JOURNEY || screen == Screen.PLACES -> Text("\"여기 기억해 줘\"   \"휴대폰으로 보여 줘\"   \"엑셀로 내보내 줘\"", fontSize = Ui.Body, color = Ui.Muted)
+                    screen == Screen.JOURNEY -> Text("\"여기 기억해 줘\"   \"휴대폰으로 보여 줘\"   \"엑셀로 내보내 줘\"", fontSize = Ui.Body, color = Ui.Muted)
                     else -> Text("\"운행일지 정리해줘\"   \"주차 위치 기록해줘\"   \"주차 어디 했지?\"", fontSize = Ui.Body, color = Ui.Muted)
                 }
                 if (heard.isNotBlank() && step != Step.HEAR_COMMAND) Note("들은 말: \"$heard\"")

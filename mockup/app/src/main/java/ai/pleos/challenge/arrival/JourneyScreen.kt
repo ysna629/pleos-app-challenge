@@ -34,12 +34,12 @@ import kotlin.math.cos
 
 /**
  * The journey tab: where the car stopped today, the route it took, and the same phone column as every other tab.
- * Only today is shown here; starred places from earlier days live on the places tab. Sample changes remain in
- * Compose memory only.
+ * A switch at the top of the left panel turns the same tab into the list of starred places from every day
+ * ([PlacesView]). Sample changes remain in Compose memory only.
  */
 @Composable
 fun JourneyScreen(
-    today: Journey?, parked: Boolean?, preview: Boolean, onPreviewChange: (Boolean) -> Unit,
+    today: Journey?, places: List<SavedPlace>, parked: Boolean?, preview: Boolean, onPreviewChange: (Boolean) -> Unit,
     shareRequest: JourneyShareMode?, onShareRequestHandled: () -> Unit,
     onUpdate: (String, String, (JourneyStop) -> JourneyStop) -> Unit,
     onVoiceNote: (String, String) -> Unit,
@@ -51,6 +51,17 @@ fun JourneyScreen(
 ) {
     var sample by remember { mutableStateOf(sampleJourney()) }
     val journey = if (preview) sample else today
+    // Today's record or the places starred on any day; the sample is always a day.
+    var view by remember { mutableIntStateOf(VIEW_TODAY) }
+    if (preview) view = VIEW_TODAY
+    val switcher: @Composable () -> Unit = {
+        Segmented(listOf("오늘의 발자취", "다시 갈 곳${if (places.isEmpty()) "" else " ${places.size}"}"), view, enabled = !preview) { view = it }
+        Spacer(Modifier.height(16.dp))
+    }
+    if (view == VIEW_PLACES) {
+        PlacesView(places, parked, busy, onUpdate, stopMapApp, switcher)
+        return
+    }
     var selectedStopId by remember(journey?.id, preview) { mutableStateOf<String?>(null) }
     val stop = journey?.stops?.firstOrNull { it.id == selectedStopId } ?: journey?.stops?.lastOrNull()
     val canEdit = parked == true && !busy
@@ -62,6 +73,7 @@ fun JourneyScreen(
     LaunchedEffect(shareRequest) {
         if (shareRequest != null) {
             onOpenExport()
+            view = VIEW_TODAY
             share = if (shareRequest == JourneyShareMode.CSV) SHARE_CSV else SHARE_VIEW
             onShareRequestHandled()
         }
@@ -71,7 +83,8 @@ fun JourneyScreen(
         Row(Modifier.weight(1f).fillMaxHeight(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
             if (journey == null) {
                 Panel(Modifier.weight(1f).fillMaxHeight()) {
-                    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                    switcher()
+                    Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                         Heading("오늘은 아직 들른 곳이 없어요")
                         Spacer(Modifier.height(12.dp))
                         Note("주행하고 주차하면 오늘 들른 곳과 이동 경로가 여기에 모여요. 별표한 곳은 다시 갈 곳에 남아요.")
@@ -81,6 +94,7 @@ fun JourneyScreen(
                 }
             } else {
                 Panel(Modifier.weight(1f).fillMaxHeight()) {
+                    switcher()
                     Heading(journey.title)
                     when {
                         preview -> Note("예시 여행이에요. 실제 기록에는 저장되지 않아요.", color = Ui.Warn)
@@ -115,7 +129,7 @@ fun JourneyScreen(
                             }
                         }
                         if (journey.stops.isEmpty()) item { Note("주차(P)하면 첫 방문이 여기에 생겨요.", modifier = Modifier.padding(vertical = 20.dp)) }
-                        else item { Note("별표한 곳은 날이 지나도 다시 갈 곳 탭에 남아요. 나머지는 오늘만 보여요.", modifier = Modifier.padding(top = 12.dp)) }
+                        else item { Note("별표한 곳은 날이 지나도 다시 갈 곳에 남아요. 나머지는 오늘만 보여요.", modifier = Modifier.padding(top = 12.dp)) }
                     }
                     if (stop != null) {
                         Rule(Modifier.padding(vertical = 14.dp))
@@ -167,6 +181,8 @@ fun JourneyScreen(
     }
 }
 
+private const val VIEW_TODAY = 0
+private const val VIEW_PLACES = 1
 private const val SHARE_VIEW = 0
 private const val SHARE_CSV = 1
 private const val SHARE_MAP = 2

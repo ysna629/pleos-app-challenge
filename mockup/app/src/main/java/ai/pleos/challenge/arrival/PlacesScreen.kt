@@ -38,14 +38,15 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * The places tab: every stop the driver starred, from any day, newest first. The journey tab only keeps today,
- * so this is where a starred place is found again. Editing needs the car parked, like the journey tab.
+ * The journey tab's other view: every stop the driver starred, from any day, newest first. Today's view only
+ * keeps today, so this is where a starred place is found again. Editing needs the car parked, like today's view.
+ * [switcher] is the today/places control the journey tab puts at the top of the left panel.
  */
 @Composable
-fun PlacesScreen(
+fun PlacesView(
     places: List<SavedPlace>, parked: Boolean?, busy: Boolean,
     onUpdate: (String, String, (JourneyStop) -> JourneyStop) -> Unit,
-    stopMapApp: StopMapApp,
+    stopMapApp: StopMapApp, switcher: @Composable () -> Unit,
 ) {
     var selectedId by remember { mutableStateOf<String?>(null) }
     val place = places.firstOrNull { it.stop.id == selectedId } ?: places.firstOrNull()
@@ -54,8 +55,8 @@ fun PlacesScreen(
 
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
         Panel(Modifier.weight(1f).fillMaxHeight()) {
-            Heading("다시 갈 곳")
-            Note(if (places.isEmpty()) "여행 탭에서 별표한 곳이 여기에 모여요." else "${places.size}곳, 최근에 들른 곳이 위에 있어요.")
+            switcher()
+            Note(if (places.isEmpty()) "오늘의 발자취에서 별표한 곳이 여기에 모여요." else "최근에 들른 곳이 위에 있어요.")
             Spacer(Modifier.height(12.dp))
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(places, key = { it.stop.id }) { item ->
@@ -81,7 +82,7 @@ fun PlacesScreen(
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                     Heading("아직 저장한 곳이 없어요")
                     Spacer(Modifier.height(12.dp))
-                    Note("여행 탭에서 들른 곳 옆의 별을 누르거나, 달리면서 \"여기 기억해 줘\"라고 말하면 여기에 남아요.")
+                    Note("오늘의 발자취에서 들른 곳 옆의 별을 누르거나, 달리면서 \"여기 기억해 줘\"라고 말하면 여기에 남아요.")
                 }
             } else {
                 PlaceDetails(place, canEdit, parked) { change -> onUpdate(place.journeyId, place.stop.id, change) }
