@@ -1292,7 +1292,7 @@ class MainActivity : ComponentActivity() {
     private fun RecordShare(url: String?, text: String?, empty: String) {
         QrPlate(url, "기록 페이지 QR 코드", empty = empty)
         if (url != null) {
-            Note("카메라로 스캔하면 기록 페이지가 열려요. 거기서 지도 앱으로 열거나 문자로 보낼 수 있어요.")
+            Note("스캔하면 이 기록이 휴대폰에서 열려요. 지도 앱으로 열거나 문자로 보낼 수 있어요.")
             if (phone.count(Char::isDigit) < 10) {
                 Note("설정에 내 번호를 넣어 두면 문자 받는 사람이 자동으로 채워져요.", color = Ui.Warn)
                 QuietButton("설정 열기") { beforeSettings = screen; screen = Screen.SETTINGS }
@@ -1536,7 +1536,7 @@ class MainActivity : ComponentActivity() {
                 .also { Log.i(TAG, "monthly ${it.length} chars $it") }
         }
         QrPlate(url, "월간 운행기록부 QR 코드", empty = "QR을 만들지 못했어요.")
-        Note("카메라로 스캔하면 이 달의 운행기록부가 열려요. 엑셀로 받을 수 있어요.")
+        Note("스캔하면 이 달의 운행기록부가 휴대폰에서 열려요. 엑셀로 저장할 수 있어요.")
         Column(Modifier.fillMaxWidth().background(Ui.Raised, Ui.ControlShape).padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("${inMonth.size}건, 총 ${km(sum.totalKm)}", fontSize = Ui.Small, color = Ui.Ink)
             Text("업무용 ${km(sum.workKm)}", fontSize = Ui.Small, color = Ui.Ink)
