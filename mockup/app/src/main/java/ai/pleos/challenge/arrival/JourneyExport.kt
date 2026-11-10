@@ -12,7 +12,11 @@ import java.util.zip.Deflater
 
 /** A fixed snapshot keeps CSV and QR dates/durations identical while the live trip continues. */
 object JourneyExport {
-    const val MAX_LINK_BYTES = 1800
+    /**
+     * Keeps each QR at version 20 or below (97 modules). On the 380dp plate that is about 4px per module, which a
+     * phone camera still reads from the car screen; the earlier 1800-byte cap gave version 33+ codes that did not scan.
+     */
+    const val MAX_LINK_BYTES = 800
     private const val MAX_STOPS_PER_LINK = 500
     private const val MAX_PAYLOAD_BYTES = 200_000
 
@@ -72,12 +76,19 @@ object JourneyExport {
             offset = 0
             return groups.mapIndexed { index, stops ->
                 require(payload(stops, offset, index + 1, groups.size).size <= MAX_PAYLOAD_BYTES) { "한 방문 기록이 너무 커요. CSV 파일로 저장해 주세요." }
-                val result = link(prefix, stops, offset, index + 1, groups.size)
+                var result = link(prefix, stops, offset, index + 1, groups.size)
+                // A single stop whose note alone overflows the QR keeps a shortened note in the link; the CSV file has it in full.
+                if (stops.size == 1) for (keep in NOTE_CUTS) {
+                    if (result.toByteArray(Charsets.UTF_8).size <= MAX_LINK_BYTES) break
+                    result = link(prefix, listOf(stops.single().let { it.copy(note = it.note.take(keep).trimEnd() + "…") }), offset, index + 1, groups.size)
+                }
                 require(result.toByteArray(Charsets.UTF_8).size <= MAX_LINK_BYTES) { "한 방문 기록이 QR에 담기에는 너무 커요. CSV 파일로 저장해 주세요." }
                 offset += stops.size
                 result
             }
         }
+
+        private val NOTE_CUTS = listOf(140, 90, 50, 20, 0)
 
         private fun payload(stops: List<JourneyStop>, offset: Int, part: Int, parts: Int): ByteArray {
             val data = JSONObject().put("v", 1).put("kind", "journey").put("title", journey.title)
@@ -86,11 +97,14 @@ object JourneyExport {
                 .put("sample", sample).put("offset", offset).put("part", part).put("parts", parts).put("total", journey.stops.size)
                 .put("stops", JSONArray(stops.map { stop -> JSONArray(listOf(
                     stop.arrivedAt, stop.departedAt ?: JSONObject.NULL,
-                    stop.point?.latitude ?: JSONObject.NULL, stop.point?.longitude ?: JSONObject.NULL,
+                    stop.point?.latitude?.let(::coordinate) ?: JSONObject.NULL, stop.point?.longitude?.let(::coordinate) ?: JSONObject.NULL,
                     stop.name, stop.address, stop.favorite, stop.note, stop.interrupted,
                 )) }))
             return data.toString().toByteArray(Charsets.UTF_8)
         }
+
+        /** Five decimals is about a metre; the full double only costs QR space. */
+        private fun coordinate(value: Double): Double = Math.round(value * 100_000) / 100_000.0
 
         private fun link(prefix: String, stops: List<JourneyStop>, offset: Int, part: Int, parts: Int): String {
             val compressor = Deflater(Deflater.BEST_COMPRESSION, true)
