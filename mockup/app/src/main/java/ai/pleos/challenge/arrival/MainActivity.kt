@@ -84,9 +84,10 @@ import kotlinx.coroutines.withContext
  * Mockup of the arrival assistant. Recording is automatic and silent; organizing happens on request.
  * - Leaving P / returning to P records a [Segment] (time, odometer, navigation address).
  * - Returning to P only shows a quiet banner.
- * - The mic button takes a command: "운행일지 정리해줘" merges the open segments into one trip, asks the
- *   purpose, saves it, then offers to record the parking spot (floor, then pillar). "주차 어디 했지?" answers
- *   with the last saved spot.
+ * - The mic button takes a command: "운행일지 정리해줘" merges the open segments into one trip, saves it as
+ *   business use (changeable on screen), then asks where the car is parked. "주차 어디 했지?" answers with the
+ *   last saved spot.
+ * - Parked behind another app, it asks aloud instead: "도착하셨나요?", "운행을 기록할까요?", then the parking spot.
  *
  * Demo: `adb shell am start -n ai.pleos.challenge.arrival/.MainActivity --ez demo_audio true`
  * then drive with the Virtual Console (odometer + gear). Each STT request is fed the next phrase in [DEMO_SCRIPT]
@@ -100,8 +101,6 @@ class MainActivity : ComponentActivity() {
     private enum class Step {
         IDLE, HEAR_COMMAND, ASK_JOURNEY_NOTE, HEAR_JOURNEY_NOTE,
         ASK_PARKED, HEAR_PARKED, ASK_ARRIVAL, HEAR_ARRIVAL,
-        ASK_PURPOSE, HEAR_PURPOSE, CHOOSE_PURPOSE,
-        ASK_PARK, HEAR_PARK, CHOOSE_PARK,
         ASK_FLOOR, HEAR_FLOOR, ASK_PILLAR, HEAR_PILLAR, ASK_SPOT_NOTE, HEAR_SPOT_NOTE, ASK_CONFIRM, HEAR_CONFIRM, REVIEW_SPOT,
     }
 
@@ -556,8 +555,6 @@ class MainActivity : ComponentActivity() {
         when (step) {
             Step.ASK_PARKED -> listenFor(Step.HEAR_PARKED)
             Step.ASK_ARRIVAL -> listenFor(Step.HEAR_ARRIVAL)
-            Step.ASK_PURPOSE -> listenFor(Step.HEAR_PURPOSE)
-            Step.ASK_PARK -> listenFor(Step.HEAR_PARK)
             Step.ASK_FLOOR -> listenFor(Step.HEAR_FLOOR)
             Step.ASK_SPOT_NOTE -> listenFor(Step.HEAR_SPOT_NOTE)
             Step.ASK_PILLAR -> listenFor(Step.HEAR_PILLAR)
@@ -668,7 +665,7 @@ class MainActivity : ComponentActivity() {
                 voice.stopListening()
                 step = Step.IDLE
                 when (Commands.parseParked(text).takeIf { parked == true }) {
-                    true -> say(Step.ASK_ARRIVAL, "운행일지 정리할까요?")
+                    true -> say(Step.ASK_ARRIVAL, "운행을 기록할까요?")
                     false -> say(Step.IDLE, "알겠어요. 이어서 기록할게요.")
                     null -> Unit
                 }
@@ -676,10 +673,15 @@ class MainActivity : ComponentActivity() {
             Step.HEAR_ARRIVAL -> {
                 voice.stopListening()
                 step = Step.IDLE
-                when (Commands.parseYesNo(text).takeIf { parked == true }) {
-                    true -> startLogbook()
-                    false -> say(Step.IDLE, "알겠어요. 필요할 때 불러 주세요.")
-                    null -> Unit
+                // "응" records it as business use; "출퇴근이야" or "개인 용도야" records it as that instead.
+                // "아니" leaves the segments for later and still offers the parking spot.
+                val purpose = Commands.parsePurpose(text)
+                val yes = Commands.parseYesNo(text)
+                when {
+                    parked != true -> Unit
+                    purpose != null -> startLogbook(purpose, brief = true)
+                    yes == true -> startLogbook(brief = true)
+                    yes == false -> startParkOnly()
                 }
             }
             Step.HEAR_JOURNEY_NOTE -> {
@@ -691,16 +693,6 @@ class MainActivity : ComponentActivity() {
                 } else journeyFeedback = "메모를 듣지 못했어요. 다시 말하거나 직접 입력해 주세요."
                 journeyNoteTarget = null
                 step = Step.IDLE
-            }
-            Step.HEAR_PURPOSE -> {
-                val purpose = Commands.parsePurpose(text)
-                Log.i(TAG, "purpose -> $purpose")
-                if (purpose != null) savePurpose(purpose) else say(Step.CHOOSE_PURPOSE, "화면에서 운행 구분을 골라 주세요.")
-            }
-            Step.HEAR_PARK -> when (Commands.parseYesNo(text)) {
-                true -> askFloor()
-                false -> finishLogbook("알겠어요. 운행일지만 저장했어요.")
-                null -> say(Step.CHOOSE_PARK, "주차 위치를 기록할지 화면에서 골라 주세요.")
             }
             // The answer to "어디에 주차하셨나요?": a floor (with or without a pillar), a parking tower,
             // an open-air spot, or any short description. Not every car park has floors and pillars.
@@ -714,11 +706,18 @@ class MainActivity : ComponentActivity() {
                 when {
                     tower != null -> { setFreeSpot(tower); reviewSpot() }
                     floor != null && pillar != null -> { setPillar(pillar); reviewSpot() }
+                    // A floor followed by a description rather than a pillar code: keep it as said ("지하 1층 B동 앞").
+                    floor != null && ParkingText.placeAfterFloor(text) != null -> {
+                        setFreeSpot("${ParkingText.floorLabel(floor!!)} ${ParkingText.placeAfterFloor(text)}".take(40))
+                        reviewSpot()
+                    }
                     floor != null -> say(Step.ASK_PILLAR, "기둥 번호를 말씀해 주세요. 없으면 없다고 하셔도 돼요.")
                     ParkingText.isOutdoor(text) -> {
                         setFreeSpot(ParkingText.OUTDOOR)
                         say(Step.ASK_SPOT_NOTE, "근처에 보이는 걸 한마디로 말씀해 주세요.")
                     }
+                    // The spot is asked right after the trip is recorded, so "아니" here means no spot.
+                    Commands.parseYesNo(text) == false -> skipSpot()
                     text.isNotBlank() -> { setFreeSpot(text.trim().trimEnd('.').take(40)); reviewSpot() }
                     else -> reviewSpot()
                 }
@@ -746,11 +745,15 @@ class MainActivity : ComponentActivity() {
 
     // ---- Logbook flow ----
 
-    private fun startLogbook() {
+    /**
+     * Saves the unorganized segments as one trip and goes straight on to the parking spot. The purpose defaults
+     * to business use and can be changed on screen. [brief] is the short wording used after the arrival question.
+     */
+    private fun startLogbook(purpose: Purpose = Purpose.BUSINESS, brief: Boolean = false) {
         if (!running || parked != true) return
         showBanner = false
-        val trip = Logbook.merge(segments)
-        if (trip == null) {
+        val merged = Logbook.merge(segments)
+        if (merged == null) {
             // Only short moves (or nothing) since the last entry: drop them so they never become a trip.
             segments.removeAll { it.isClosed }
             saveSegments()
@@ -760,30 +763,37 @@ class MainActivity : ComponentActivity() {
             say(Step.IDLE, reply)
             return
         }
+        val trip = merged.copy(purpose = purpose)
         draft = trip
         parkOnly = false
         clearSpot()
+        notice = ""
         screen = Screen.LOGBOOK
-        val start = SimpleDateFormat("H시 m분", Locale.KOREA).format(Date(trip.startedAt))
-        val place = trip.endAddress.ifBlank { "목적지" }
-        say(
-            Step.ASK_PURPOSE,
-            "${start}에 출발해서 ${place}에 도착했어요. ${spokenKm(trip.startKm)}에서 ${spokenKm(trip.endKm)}까지, " +
-                "총 ${spokenDistance(trip.distanceKm)}예요. 업무 운행인가요, 출퇴근인가요?",
-        )
-    }
-
-    /** Saves the merged trip to the logbook and clears the segments it came from. */
-    private fun savePurpose(purpose: Purpose) {
-        val trip = draft?.copy(purpose = purpose) ?: return
-        draft = trip
         trips.add(0, trip)
         store.save(trips)
         segments.removeAll { it.isClosed && it.departAt >= trip.startedAt && it.arriveAt!! <= trip.endedAt }
         saveSegments()
         askedAtKm = 0f
         Log.i(TAG, "logbook saved ${trip.distanceKm}km ${purpose.label}")
-        say(Step.ASK_PARK, "${purpose.short} 운행으로 저장했어요. 주차 위치도 기록할까요?")
+        val recorded = if (brief) {
+            "${spokenDistance(trip.distanceKm)} 운행을 기록합니다."
+        } else {
+            val start = SimpleDateFormat("H시 m분", Locale.KOREA).format(Date(trip.startedAt))
+            val place = trip.endAddress.ifBlank { "목적지" }
+            "${start}에 출발해서 ${place}에 도착했어요. ${spokenKm(trip.startKm)}에서 ${spokenKm(trip.endKm)}까지, " +
+                "총 ${spokenDistance(trip.distanceKm)}예요. 운행을 기록합니다."
+        }
+        say(Step.ASK_FLOOR, "$recorded 어디에 주차하셨나요?")
+    }
+
+    /** The purpose buttons on the organizing screen: the trip is already saved, so update it in place. */
+    private fun changePurpose(purpose: Purpose) {
+        val trip = draft ?: return
+        val index = trips.indexOfFirst { it.startedAt == trip.startedAt && it.endedAt == trip.endedAt }
+        if (index < 0) return
+        trips[index] = trips[index].copy(purpose = purpose)
+        store.save(trips)
+        draft = trips[index]
     }
 
     /** Records only where the car is parked. Open segments stay as they are, so the logbook can still be organized later. */
@@ -1207,17 +1217,10 @@ class MainActivity : ComponentActivity() {
                 Spacer(Modifier.height(24.dp))
                 Note("운행 구분")
                 Spacer(Modifier.height(8.dp))
-                val purposeOpen = step in setOf(Step.ASK_PURPOSE, Step.HEAR_PURPOSE, Step.CHOOSE_PURPOSE)
-                Segmented(
-                    Purpose.entries.map { it.label }, if (purposeOpen) -1 else Purpose.entries.indexOf(trip.purpose), enabled = purposeOpen,
-                ) { savePurpose(Purpose.entries[it]) }
+                Segmented(Purpose.entries.map { it.label }, Purpose.entries.indexOf(trip.purpose)) { changePurpose(Purpose.entries[it]) }
             }
             AssistantPanel {
                 when (step) {
-                    Step.ASK_PARK, Step.HEAR_PARK, Step.CHOOSE_PARK -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        PrimaryButton("주차 위치 기록") { listenToken++; voice.stopListening(); askFloor() }
-                        QuietButton("안 할게요") { finishLogbook("알겠어요. 운행일지만 저장했어요.") }
-                    }
                     Step.ASK_FLOOR, Step.HEAR_FLOOR, Step.ASK_PILLAR, Step.HEAR_PILLAR, Step.ASK_SPOT_NOTE, Step.HEAR_SPOT_NOTE,
                     Step.ASK_CONFIRM, Step.HEAR_CONFIRM, Step.REVIEW_SPOT -> SpotPicker()
                     else -> Unit
@@ -1427,7 +1430,7 @@ class MainActivity : ComponentActivity() {
 
         /** Phrases fed to STT in order when launched with `--ez demo_audio true` (the emulator mic is silent). */
         val DEMO_SCRIPT = listOf(
-            "cmd_logbook.pcm", "purpose.pcm", "yes.pcm", "floor.pcm", "pillar.pcm", "yes.pcm",
+            "cmd_logbook.pcm", "floor.pcm", "pillar.pcm", "yes.pcm",
             "cmd_where.pcm", "cmd_logbook.pcm",
         )
 
