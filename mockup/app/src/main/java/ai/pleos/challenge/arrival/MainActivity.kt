@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -941,7 +943,9 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(screen, showManual, step) {
                 if (!showManual || step == Step.IDLE) { focus.clearFocus(); keyboard?.hide() }
             }
-            Surface(modifier = Modifier.fillMaxSize(), color = Ui.Bg) {
+            // A tap on empty space also takes the keyboard down; buttons and fields consume their own taps first.
+            val dismiss = Modifier.pointerInput(Unit) { detectTapGestures(onTap = { focus.clearFocus(); keyboard?.hide() }) }
+            Surface(modifier = Modifier.fillMaxSize().then(dismiss), color = Ui.Bg) {
                 if (showsDrivingScreen(drivingRestricted, parked)) {
                     DrivingScreen(consented, listening, partial, drivingStatus, onSave = ::savePassingPlace, onSpeak = ::callAssistant)
                     return@Surface
