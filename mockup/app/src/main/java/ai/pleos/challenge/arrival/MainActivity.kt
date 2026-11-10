@@ -101,6 +101,7 @@ import kotlinx.coroutines.withContext
 class MainActivity : ComponentActivity() {
 
     private enum class Screen { HOME, LOGBOOK, RECORDS, JOURNEY, SETTINGS }
+    private enum class SpotKind(val label: String) { LOT("주차장"), OTHER("다른 곳") }
 
     /** ASK_* speaks a question, HEAR_* listens for the answer, CHOOSE_* waits for a tap after voice failed. */
     private enum class Step {
@@ -134,7 +135,10 @@ class MainActivity : ComponentActivity() {
     private var pillarCode by mutableStateOf("")
     /** Free text typed with "직접 입력"; when set it is saved as the parking spot as is. */
     private var manualSpot by mutableStateOf("")
-    private var showManual by mutableStateOf(false)
+    /** Which kind of place: a car park with floors and pillars, or somewhere described in words. */
+    private var spotKind by mutableStateOf(SpotKind.LOT)
+    /** Optional name of the car park ("본관", "제2주차장"), spoken before the floor. */
+    private var lotName by mutableStateOf("")
     private var notice by mutableStateOf("")
     private var phone by mutableStateOf("")
     /** One map choice for everything: the record page's first button and the footprint map QR. */
@@ -601,6 +605,17 @@ class MainActivity : ComponentActivity() {
         listenFor(Step.HEAR_COMMAND)
     }
 
+    /** 취소 while listening: stop the mic and go back to idle without acting on anything heard. */
+    private fun cancelListening() {
+        if (!listening) return
+        listenToken++
+        voice.stopListening()
+        val wasNote = step == Step.HEAR_JOURNEY_NOTE
+        step = Step.IDLE
+        partial = ""
+        if (wasNote) { journeyNoteTarget = null; journeyFeedback = "메모를 취소했어요." }
+    }
+
     private fun onHeard(text: String, isFinal: Boolean) {
         if (!listening) return
         partial = text
@@ -711,7 +726,7 @@ class MainActivity : ComponentActivity() {
             // an open-air spot, or any short description. Not every car park has floors and pillars.
             Step.HEAR_FLOOR -> {
                 val tower = ParkingText.towerLabel(text)
-                floor = if (tower == null) ParkingText.parseFloor(text) else null
+                chooseFloor(if (tower == null) ParkingText.parseFloor(text) else null)
                 if (floor != null) notice = ""
                 // Some people answer with the whole spot at once ("지하 5층 A4").
                 val pillar = ParkingText.parseSentence(text).second?.takeIf { floor != null }
@@ -836,7 +851,8 @@ class MainActivity : ComponentActivity() {
         floor = null
         pillarCode = ""
         manualSpot = ""
-        showManual = false
+        lotName = ""
+        spotKind = SpotKind.LOT
     }
 
     /** A spot that is not floor + pillar. It goes in the free-text field so it can be fixed by typing. */
@@ -844,11 +860,18 @@ class MainActivity : ComponentActivity() {
         floor = null
         pillarCode = ""
         manualSpot = text
-        showManual = true
+        spotKind = SpotKind.OTHER
+    }
+
+    private fun chooseFloor(value: Int?) {
+        floor = value
+        if (value != null) { spotKind = SpotKind.LOT; manualSpot = "" }
     }
 
     private fun setPillar(code: String) {
         pillarCode = code
+        spotKind = SpotKind.LOT
+        manualSpot = ""
     }
 
     /** Reads the spot back and asks to save it by voice; the save button stays available. */
@@ -866,8 +889,11 @@ class MainActivity : ComponentActivity() {
         question = "맞으면 저장을 눌러 주세요."
     }
 
-    private fun parkingText(): String =
-        manualSpot.trim().ifBlank { ParkingText.format(floor, pillarCode) }
+    /** 주차장 → 층 → 기둥 in that order for a car park; the words as typed or heard anywhere else. */
+    private fun parkingText(): String = when (spotKind) {
+        SpotKind.OTHER -> manualSpot.trim()
+        SpotKind.LOT -> listOf(lotName.trim(), ParkingText.format(floor, pillarCode)).filter { it.isNotBlank() }.joinToString(" ")
+    }
 
     private fun saveSpot(spot: String) {
         if (parkOnly) {
@@ -943,9 +969,8 @@ class MainActivity : ComponentActivity() {
             // Leaving a screen, or closing the free-text field, takes the keyboard down with it.
             val keyboard = LocalSoftwareKeyboardController.current
             val focus = LocalFocusManager.current
-            LaunchedEffect(screen, showManual, step) {
-                if (!showManual || step == Step.IDLE) { focus.clearFocus(); keyboard?.hide() }
-            }
+            LaunchedEffect(screen) { focus.clearFocus(); keyboard?.hide() }
+            LaunchedEffect(step) { if (step == Step.IDLE) { focus.clearFocus(); keyboard?.hide() } }
             // A tap on empty space also takes the keyboard down; buttons and fields consume their own taps first.
             val dismiss = Modifier.pointerInput(Unit) { detectTapGestures(onTap = { focus.clearFocus(); keyboard?.hide() }) }
             Surface(modifier = Modifier.fillMaxSize().then(dismiss), color = Ui.Bg) {
@@ -970,7 +995,7 @@ class MainActivity : ComponentActivity() {
                                 today = JourneyDays.today(journeys, System.currentTimeMillis()), places = savedPlaces(journeys), parked = parked, preview = journeyPreview, onPreviewChange = { journeyPreview = it },
                                 shareRequest = journeyShareRequest, onShareRequestHandled = { journeyShareRequest = null },
                                 onUpdate = ::updateJourneyStop,
-                                onVoiceNote = ::recordJourneyNote, recording = step == Step.ASK_JOURNEY_NOTE || step == Step.HEAR_JOURNEY_NOTE,
+                                onVoiceNote = ::recordJourneyNote, onCancelNote = ::cancelListening, recording = step == Step.ASK_JOURNEY_NOTE || step == Step.HEAR_JOURNEY_NOTE,
                                 partial = partial, feedback = journeyFeedback,
                                 viewerBase = viewerBase(),
                                 exportMessage = exportMessage, onSaveCsv = ::saveJourneyCsv,
@@ -1276,6 +1301,8 @@ class MainActivity : ComponentActivity() {
                 if (heard.isNotBlank() && step != Step.HEAR_COMMAND) Note("들은 말: \"$heard\"")
                 if (notice.isNotBlank() && step == Step.HEAR_COMMAND) Note(notice, color = Ui.Warn)
             }
+            // The mic button stays where it is while listening, so a second tap cannot land on 취소 by accident.
+            if (step == Step.HEAR_COMMAND) QuietButton("취소") { cancelListening() }
         }
     }
 
@@ -1398,48 +1425,65 @@ class MainActivity : ComponentActivity() {
     private fun SpotPicker() {
         val spot = parkingText()
         val reviewing = step in setOf(Step.ASK_CONFIRM, Step.HEAR_CONFIRM, Step.REVIEW_SPOT)
-        // While the field has focus the keyboard is up: the key grids are useless then and would push the buttons
+        // While a text field has focus the keyboard is up: the key grids are useless then and would push the buttons
         // under it (the IME's touch area reaches above its visible keys), so only the field and the buttons stay.
         var typing by remember { mutableStateOf(false) }
         Text(spot.ifBlank { "주차 위치" }, fontSize = Ui.Value, fontWeight = FontWeight.Bold, color = if (spot.isBlank()) Ui.Muted else Ui.Ink)
         Spacer(Modifier.height(16.dp))
-        if (!typing) {
-        Note("층이 없는 곳")
-        val presets = listOf(ParkingText.TOWER, ParkingText.OUTDOOR)
-        Keys(presets, presets.indexOfFirst { manualSpot.startsWith(it) }) { setFreeSpot(presets[it]); onSpotEdited() }
-        Note("층")
-        // Picking a floor or pillar goes back to the structured spot, so drop any free text.
-        Keys(FLOORS.map { if (it < 0) "B${-it}" else "${it}F" }, FLOORS.indexOf(floor)) { manualSpot = ""; floor = FLOORS[it]; onSpotEdited() }
-        Note(if (pillarCode.isBlank()) "기둥 번호" else "기둥 번호 $pillarCode")
-        // Each tap appends, so codes such as AL02 or B-15 can be built; leading zeros are kept.
-        Keys(LETTERS.map(Char::toString), -1) { manualSpot = ""; pillarCode = (pillarCode + LETTERS[it]).take(8); onSpotEdited() }
-        Keys((1..9).map(Int::toString) + "0" + "-" + "지우기" + "전체 지우기", -1) { index ->
-            Log.i(TAG, "pillar key $index (was $pillarCode)")
-            pillarCode = when (index) {
-                9 -> (pillarCode + "0").take(8)
-                10 -> (pillarCode + "-").take(8)
-                11 -> pillarCode.dropLast(1)
-                12 -> ""
-                else -> (pillarCode + (index + 1)).take(8)
+        // Two kinds of place: a car park, where the spot is 주차장 → 층 → 기둥, and anywhere else, said in words.
+        Segmented(SpotKind.entries.map { it.label }, SpotKind.entries.indexOf(spotKind)) {
+            val kind = SpotKind.entries[it]
+            if (kind != spotKind) { spotKind = kind; onSpotEdited() }
+        }
+        Spacer(Modifier.height(16.dp))
+        when (spotKind) {
+            SpotKind.LOT -> {
+                OutlinedTextField(
+                    value = lotName,
+                    onValueChange = { lotName = it.take(20); onSpotEdited() },
+                    label = { Text("주차장 (선택, 예: 본관, 제2주차장)") },
+                    singleLine = true,
+                    textStyle = TextStyle(fontSize = Ui.Body),
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { typing = it.isFocused },
+                )
+                if (!typing) {
+                    Spacer(Modifier.height(8.dp))
+                    Note("층")
+                    Keys(FLOORS.map { if (it < 0) "B${-it}" else "${it}F" }, FLOORS.indexOf(floor)) { chooseFloor(FLOORS[it]); onSpotEdited() }
+                    Note(if (pillarCode.isBlank()) "기둥 번호" else "기둥 번호 $pillarCode")
+                    // Each tap appends, so codes such as AL02 or B-15 can be built; leading zeros are kept.
+                    Keys(LETTERS.map(Char::toString), -1) { setPillar((pillarCode + LETTERS[it]).take(8)); onSpotEdited() }
+                    Keys((1..9).map(Int::toString) + "0" + "-" + "지우기" + "전체 지우기", -1) { index ->
+                        setPillar(when (index) {
+                            9 -> (pillarCode + "0").take(8)
+                            10 -> (pillarCode + "-").take(8)
+                            11 -> pillarCode.dropLast(1)
+                            12 -> ""
+                            else -> (pillarCode + (index + 1)).take(8)
+                        })
+                        onSpotEdited()
+                    }
+                }
             }
-            onSpotEdited()
+            SpotKind.OTHER -> {
+                if (!typing) {
+                    val presets = listOf(ParkingText.TOWER, ParkingText.OUTDOOR, "길가")
+                    Keys(presets, presets.indexOfFirst { manualSpot.startsWith(it) }) { setFreeSpot(presets[it]); onSpotEdited() }
+                }
+                OutlinedTextField(
+                    value = manualSpot,
+                    onValueChange = { setFreeSpot(it.take(40)); onSpotEdited() },
+                    label = { Text("어디인지 한마디로 (예: 주차타워 3번, 정문 옆 편의점 앞)") },
+                    singleLine = true,
+                    textStyle = TextStyle(fontSize = Ui.Body),
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { typing = it.isFocused },
+                )
+            }
         }
-        }
-        if (showManual) {
-            OutlinedTextField(
-                value = manualSpot,
-                onValueChange = { manualSpot = it.take(40); onSpotEdited() },
-                label = { Text("주차 위치 직접 입력 (예: 주차타워 3번, 정문 옆 편의점 앞)") },
-                singleLine = true,
-                textStyle = TextStyle(fontSize = Ui.Body),
-                modifier = Modifier.fillMaxWidth().onFocusChanged { typing = it.isFocused },
-            )
-            Spacer(Modifier.height(12.dp))
-        }
+        Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             PrimaryButton("저장", enabled = reviewing && spot.isNotBlank()) { saveSpot(spot) }
             QuietButton("다시 묻기", enabled = reviewing) { askFloor() }
-            QuietButton(if (showManual) "직접 입력 닫기" else "직접 입력") { showManual = !showManual }
             QuietButton(if (parkOnly) "취소" else "건너뛰기") { skipSpot() }
         }
     }

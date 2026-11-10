@@ -42,7 +42,7 @@ fun JourneyScreen(
     today: Journey?, places: List<SavedPlace>, parked: Boolean?, preview: Boolean, onPreviewChange: (Boolean) -> Unit,
     shareRequest: JourneyShareMode?, onShareRequestHandled: () -> Unit,
     onUpdate: (String, String, (JourneyStop) -> JourneyStop) -> Unit,
-    onVoiceNote: (String, String) -> Unit,
+    onVoiceNote: (String, String) -> Unit, onCancelNote: () -> Unit,
     recording: Boolean, partial: String, feedback: String,
     viewerBase: String, exportMessage: String,
     onSaveCsv: (JourneyExport.Snapshot) -> Unit,
@@ -134,7 +134,7 @@ fun JourneyScreen(
                     if (stop != null) {
                         Rule(Modifier.padding(vertical = 14.dp))
                         StopDetails(
-                            stop, preview, canEdit, recording, partial, feedback,
+                            stop, preview, canEdit, recording, partial, feedback, onCancelNote,
                             onUpdate = { change -> if (canEdit) { if (preview) sample = sample.updateStop(stop.id, change) else onUpdate(journey.id, stop.id, change) } },
                             onVoice = { if (canEdit) { if (preview) sample = sample.updateStop(stop.id) { it.copy(note = "아이도 좋아했어요. 다음 나들이에 또 오기!") } else onVoiceNote(journey.id, stop.id) } },
                             modifier = Modifier.weight(1f),
@@ -196,7 +196,7 @@ private fun stay(stop: JourneyStop, journey: Journey): String = when {
 
 @Composable
 private fun StopDetails(
-    stop: JourneyStop, preview: Boolean, canEdit: Boolean, recording: Boolean, partial: String, feedback: String,
+    stop: JourneyStop, preview: Boolean, canEdit: Boolean, recording: Boolean, partial: String, feedback: String, onCancel: () -> Unit,
     onUpdate: ((JourneyStop) -> JourneyStop) -> Unit, onVoice: () -> Unit, modifier: Modifier,
 ) {
     var category by remember(stop.id) { mutableStateOf("FD6") }
@@ -243,7 +243,8 @@ private fun StopDetails(
         if (stop.point == null) Note("위치 정보가 없어요. 메모는 남길 수 있어요.", color = Ui.Warn)
         if (stop.note.isNotBlank() && !manual) Text(stop.note, color = Ui.Ink, fontSize = Ui.Body)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            QuietButton("음성 메모", enabled = canEdit, onClick = onVoice)
+            if (recording) QuietButton("취소", onClick = onCancel)
+            else QuietButton("음성 메모", enabled = canEdit, onClick = onVoice)
             QuietButton(if (manual) "메모 닫기" else "메모 고치기", enabled = canEdit) { manual = !manual }
         }
         if (recording) Note("듣고 있어요  $partial", color = Ui.Accent)
