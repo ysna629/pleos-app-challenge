@@ -1096,7 +1096,7 @@ class MainActivity : ComponentActivity() {
                         pair.forEach { (key, label) -> ProfileField(key, label, Modifier.weight(1f)) }
                     }
                 }
-                Note("휴대폰 번호는 기록 페이지에서 문자를 보낼 때 받는 사람으로, 나머지는 월간 운행기록부 양식의 위쪽 칸을 채우는 데 써요. 비워 두면 빈칸으로 나와요. 모두 이 차량 안에만 저장돼요.")
+                Note("휴대폰 번호는 기록 페이지에서 문자를 보낼 때 받는 사람으로 써요. 나머지는 월간 운행기록부 양식에 사용돼요. 비워 두면 빈칸으로 나와요. 모두 이 차량 안에만 저장돼요.")
             }
             Panel(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
                 Spacer(Modifier.height(50.dp))
