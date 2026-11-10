@@ -32,7 +32,7 @@ fun JourneyQrShare(
     var index by remember(snapshot, csv) { mutableIntStateOf(0) }
     Text("${snapshot.journey.title}, 방문 ${snapshot.journey.stops.size}곳", fontSize = Ui.Body, color = Ui.Ink)
     QrPlate(
-        links.getOrNull(index), "${if (csv) "엑셀 다운로드" else "여행 기록 보기"} QR ${index + 1}/${links.size}",
+        links.getOrNull(index), "${if (csv) "엑셀 다운로드" else "발자취 기록 보기"} QR ${index + 1}/${links.size}",
         empty = result.exceptionOrNull()?.message ?: "QR을 만들지 못했어요.",
     )
     if (links.size > 1) {

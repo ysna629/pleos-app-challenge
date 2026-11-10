@@ -56,7 +56,7 @@ fun PlacesView(
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
         Panel(Modifier.weight(1f).fillMaxHeight()) {
             switcher()
-            Note(if (places.isEmpty()) "오늘의 발자취에서 별표한 곳이 여기에 모여요." else "최근에 들른 곳이 위에 있어요.")
+            Note(if (places.isEmpty()) "오늘 걸음에서 별표한 곳이 여기에 모여요." else "최근에 남긴 발자국이 위에 있어요.")
             Spacer(Modifier.height(12.dp))
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(places, key = { it.stop.id }) { item ->
@@ -80,9 +80,9 @@ fun PlacesView(
         Panel(Modifier.weight(1f).fillMaxHeight()) {
             if (place == null) {
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Heading("아직 저장한 곳이 없어요")
+                    Heading("아직 남긴 발자국이 없어요")
                     Spacer(Modifier.height(12.dp))
-                    Note("오늘의 발자취에서 들른 곳 옆의 별을 누르거나, 달리면서 \"여기 기억해 줘\"라고 말하면 여기에 남아요.")
+                    Note("오늘 걸음에서 들른 곳 옆의 별을 누르거나, 달리면서 \"여기 기억해 줘\"라고 말하면 여기에 남아요.")
                 }
             } else {
                 PlaceDetails(place, canEdit, parked) { change -> onUpdate(place.journeyId, place.stop.id, change) }
@@ -118,8 +118,8 @@ private fun PlaceDetails(place: SavedPlace, canEdit: Boolean, parked: Boolean?, 
         }
         Spacer(Modifier.weight(1f))
         // Unstarring is the only way off this list, and past days keep nothing else, so it is one deliberate button.
-        QuietButton("다시 갈 곳에서 빼기", enabled = canEdit) { onUpdate { it.copy(favorite = false) } }
-        Note(if (parked == true) "지난 날의 장소는 별을 빼면 다시 찾을 수 없어요." else "주차(P)하면 고치거나 뺄 수 있어요.", color = if (parked == true) Ui.Muted else Ui.Warn)
+        QuietButton("발자국 지우기", enabled = canEdit) { onUpdate { it.copy(favorite = false) } }
+        Note(if (parked == true) "지난 날의 발자국은 지우면 다시 찾을 수 없어요." else "주차(P)하면 고치거나 지울 수 있어요.", color = if (parked == true) Ui.Muted else Ui.Warn)
     }
 }
 

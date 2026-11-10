@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<title>도착노트 · 여행 기록</title>
+<title>Route94 · 발자취</title>
 <style>
   :root{color-scheme:light dark;--bg:#f5f7f8;--panel:#fff;--ink:#14262e;--muted:#5a6d75;--line:#dce5e7;--accent:#087d6c}
   @media(prefers-color-scheme:dark){:root{--bg:#10191f;--panel:#19262e;--ink:#edf6f6;--muted:#a4b6bc;--line:#34454f;--accent:#5ec8b8}}
@@ -21,14 +21,14 @@
 </head>
 <body>
 <main>
-  <span class="brand">도착노트 / 여행 기록</span>
-  <h1 id="title">여행 기록을 여는 중…</h1>
+  <span class="brand">Route94 / 발자취</span>
+  <h1 id="title">발자취를 여는 중…</h1>
   <p id="status" role="status"></p>
   <div id="content" hidden>
     <section class="panel">
       <div class="stats">
         <div><b id="count"></b><span>이 파일의 방문 기록</span></div>
-        <div><b id="favorites"></b><span>이 파일의 다시 갈 곳</span></div>
+        <div><b id="favorites"></b><span>이 파일의 발자국</span></div>
         <div><b id="distance"></b><span>전체 여행의 수집 GPS 거리</span></div>
       </div>
       <p id="part"></p>
@@ -37,11 +37,11 @@
         <button id="csv" class="primary">엑셀에서 열 수 있는 CSV 저장</button>
         <button id="print">인쇄 · PDF</button>
       </div>
-      <p id="sample" class="warn" hidden>예시 여행이에요. 실제 방문 기록이 아닙니다.</p>
+      <p id="sample" class="warn" hidden>예시 기록이에요. 실제 방문 기록이 아닙니다.</p>
     </section>
     <section class="panel">
       <div class="scroll"><table>
-        <thead><tr><th>순서</th><th>장소 · 주소</th><th>도착 · 출발</th><th>체류</th><th>다시 갈 곳</th><th>메모</th><th>GPS 좌표</th></tr></thead>
+        <thead><tr><th>순서</th><th>장소 · 주소</th><th>도착 · 출발</th><th>체류</th><th>발자국</th><th>메모</th><th>GPS 좌표</th></tr></thead>
         <tbody id="rows"></tbody>
       </table></div>
     </section>
@@ -55,7 +55,7 @@ window.addEventListener('hashchange', () => location.reload());
 try {
   const {decodeJourney, formatDate, visitRows, buildCsv, exportFilename} = await import('./journey-export.mjs?v=20261106c');
   const data = await decodeJourney(location.hash.slice(1));
-  document.title = `${data.title} · 도착노트 여행 기록`;
+  document.title = `${data.title} · Route94 발자취`;
   $('title').textContent = data.title;
   $('status').textContent = `${formatDate(data.startedAt,data.zone)} 출발 · ${data.endedAt === null ? '여행 중' : formatDate(data.endedAt,data.zone)+' 종료'}`;
   $('count').textContent = `${data.stops.length}곳`;
@@ -77,7 +77,7 @@ try {
   $('print').addEventListener('click',()=>window.print());
   $('content').hidden=false;
 } catch {
-  $('title').textContent='여행 기록을 읽지 못했어요';
+  $('title').textContent='발자취를 읽지 못했어요';
   $('status').textContent='차량 화면의 QR을 다시 스캔해 주세요. 계속 열리지 않으면 최신 브라우저를 사용하거나 차량에서 CSV 파일로 저장해 주세요.';
 }
 </script>

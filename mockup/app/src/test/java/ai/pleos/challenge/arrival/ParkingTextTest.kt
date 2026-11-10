@@ -103,14 +103,14 @@ class TripSmsTest {
 
     @Test
     fun smsBody_isShort() {
-        assertEquals("[도착노트] 지하 5층 A4 · 수정구 시흥동\n10/30 03:11 · 12.4km 업무", trip.smsBody())
+        assertEquals("[Route94] 지하 5층 A4 · 수정구 시흥동\n10/30 03:11 · 12.4km 업무", trip.smsBody())
         // A single Korean SMS holds 90 bytes in EUC-KR (2 bytes per Hangul).
         assert(trip.smsBody().toByteArray(charset("EUC-KR")).size <= 90)
     }
 
     @Test
     fun smsBody_withoutParking() {
-        assertEquals("[도착노트] 주차 위치 기록 안 함\n10/30 03:11 · 12.4km 업무", trip.copy(parking = "", endAddress = "").smsBody())
+        assertEquals("[Route94] 주차 위치 기록 안 함\n10/30 03:11 · 12.4km 업무", trip.copy(parking = "", endAddress = "").smsBody())
     }
 
     @Test

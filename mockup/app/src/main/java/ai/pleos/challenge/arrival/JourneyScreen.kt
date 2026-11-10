@@ -55,7 +55,7 @@ fun JourneyScreen(
     var view by remember { mutableIntStateOf(VIEW_TODAY) }
     if (preview) view = VIEW_TODAY
     val switcher: @Composable () -> Unit = {
-        Segmented(listOf("오늘의 발자취", "다시 갈 곳${if (places.isEmpty()) "" else " ${places.size}"}"), view, enabled = !preview) { view = it }
+        Segmented(listOf("오늘 걸음", "발자국${if (places.isEmpty()) "" else " ${places.size}"}"), view, enabled = !preview) { view = it }
         Spacer(Modifier.height(16.dp))
     }
     if (view == VIEW_PLACES) {
@@ -87,9 +87,9 @@ fun JourneyScreen(
                     Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                         Heading("오늘은 아직 들른 곳이 없어요")
                         Spacer(Modifier.height(12.dp))
-                        Note("주행하고 주차하면 오늘 들른 곳과 이동 경로가 여기에 모여요. 별표한 곳은 다시 갈 곳에 남아요.")
+                        Note("주행하고 주차하면 오늘 들른 곳과 이동 경로가 여기에 모여요. 별표한 곳은 발자국으로 남아요.")
                         Spacer(Modifier.height(24.dp))
-                        QuietButton("예시 여행 보기") { onPreviewChange(true) }
+                        QuietButton("예시 보기") { onPreviewChange(true) }
                     }
                 }
             } else {
@@ -97,7 +97,7 @@ fun JourneyScreen(
                     switcher()
                     Heading(journey.title)
                     when {
-                        preview -> Note("예시 여행이에요. 실제 기록에는 저장되지 않아요.", color = Ui.Warn)
+                        preview -> Note("예시 기록이에요. 실제 기록에는 저장되지 않아요.", color = Ui.Warn)
                         parked == null -> Note("기어를 확인하고 있어요. 주차(P)가 확인되면 고치거나 보낼 수 있어요.", color = Ui.Warn)
                         else -> Note(if (journey.endedAt == null) "기록하고 있어요" else "기록을 마쳤어요")
                     }
@@ -114,7 +114,7 @@ fun JourneyScreen(
                                     Text(s.name.ifBlank { s.address.ifBlank { "이름 없는 곳" } }, color = Ui.Ink, fontSize = Ui.Body, maxLines = 1)
                                     Note("${clock(s.arrivedAt)}, ${stay(s, journey)}")
                                 }
-                                // The star is on every row: grey until tapped, gold when it is a place to come back to.
+                                // The star is on every row: grey until tapped, gold once the driver left a footprint here.
                                 IconButton(
                                     onClick = {
                                         if (canEdit) {
@@ -124,12 +124,12 @@ fun JourneyScreen(
                                     },
                                     modifier = Modifier.size(48.dp),
                                 ) {
-                                    Icon(Icons.Filled.Star, contentDescription = if (s.favorite) "다시 갈 곳" else "다시 갈 곳으로 표시", tint = if (s.favorite) Ui.Star else Ui.Line, modifier = Modifier.size(32.dp))
+                                    Icon(Icons.Filled.Star, contentDescription = if (s.favorite) "발자국" else "발자국 남기기", tint = if (s.favorite) Ui.Star else Ui.Line, modifier = Modifier.size(32.dp))
                                 }
                             }
                         }
                         if (journey.stops.isEmpty()) item { Note("주차(P)하면 첫 방문이 여기에 생겨요.", modifier = Modifier.padding(vertical = 20.dp)) }
-                        else item { Note("별표한 곳은 날이 지나도 다시 갈 곳에 남아요. 나머지는 오늘만 보여요.", modifier = Modifier.padding(top = 12.dp)) }
+                        else item { Note("별표한 곳은 날이 지나도 발자국으로 남아요. 나머지는 오늘만 보여요.", modifier = Modifier.padding(top = 12.dp)) }
                     }
                     if (stop != null) {
                         Rule(Modifier.padding(vertical = 14.dp))
@@ -146,7 +146,7 @@ fun JourneyScreen(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(28.dp)) {
                         Figure("%.1f km".format(Locale.KOREA, journey.distanceKm), "이동")
                         Figure("${journey.stops.size}곳", "방문")
-                        Figure("${journey.stops.count { it.favorite }}곳", "다시 갈 곳")
+                        Figure("${journey.stops.count { it.favorite }}곳", "발자국")
                     }
                     Spacer(Modifier.height(16.dp))
                     Box(Modifier.weight(1f).fillMaxWidth().clip(Ui.ControlShape).background(Ui.Bg)) {
@@ -161,16 +161,16 @@ fun JourneyScreen(
                             Note("GPS로 받은 경로만 그려요. 위쪽이 북쪽이고, 번호를 누르면 그 방문을 골라요.")
                             if (journey.route.any { it.breakBefore }) Note("앱이 닫혀 있던 구간은 잇지 않아요.", color = Ui.Warn)
                         }
-                        QuietButton(if (preview) "예시 닫기" else "예시 여행 보기") { onPreviewChange(!preview) }
+                        QuietButton(if (preview) "예시 닫기" else "예시 보기") { onPreviewChange(!preview) }
                     }
                 }
             }
         }
 
-        SharePanel(listOf("여행 기록", "엑셀", "이 장소 지도"), share, { onOpenExport(); share = it }) {
+        SharePanel(listOf("발자취 기록", "엑셀", "이 장소 지도"), share, { onOpenExport(); share = it }) {
             when {
-                journey == null -> QrPlate(null, "여행 기록 QR", empty = "기록이 생기면 QR이 나타나요.")
-                !canEdit -> QrPlate(null, "여행 기록 QR", empty = if (parked == true) "지금 하던 일을 마치면 QR이 나타나요." else "주차 중일 때만 QR을 보여 줘요.")
+                journey == null -> QrPlate(null, "발자취 기록 QR", empty = "기록이 생기면 QR이 나타나요.")
+                !canEdit -> QrPlate(null, "발자취 기록 QR", empty = if (parked == true) "지금 하던 일을 마치면 QR이 나타나요." else "주차 중일 때만 QR을 보여 줘요.")
                 share == SHARE_MAP -> StopMapShare(stop, mapPick) { mapPick = it }
                 else -> {
                     val snapshot = remember(journey.id, journey.title, journey.stops, preview) { JourneyExport.snapshot(journey, preview) }
@@ -236,7 +236,7 @@ private fun StopDetails(
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(Icons.Filled.Star, contentDescription = null, tint = if (stop.favorite) Ui.Star else Ui.Line, modifier = Modifier.size(30.dp))
-                Text(if (stop.favorite) "다시 갈 곳" else "다시 갈 곳으로 표시", color = if (stop.favorite) Ui.Star else Ui.Muted, fontSize = Ui.Small)
+                Text(if (stop.favorite) "발자국" else "발자국 남기기", color = if (stop.favorite) Ui.Star else Ui.Muted, fontSize = Ui.Small)
             }
         }
         if (stop.name.isNotBlank() && stop.address.isNotBlank()) Note(stop.address)
@@ -338,7 +338,7 @@ private fun RouteOverview(journey: Journey, selected: String?, onSelect: (String
                         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                             marker.visits.forEach { item ->
                                 DropdownMenuItem(text = {
-                                    Text("${item.index + 1}. ${item.value.name.ifBlank { item.value.address.ifBlank { "방문 기록" } }}${if (item.value.favorite) " (다시 갈 곳)" else ""}", fontSize = Ui.Small)
+                                    Text("${item.index + 1}. ${item.value.name.ifBlank { item.value.address.ifBlank { "방문 기록" } }}${if (item.value.favorite) " (발자국)" else ""}", fontSize = Ui.Small)
                                 }, onClick = { expanded = false; onSelect(item.value.id) })
                             }
                         }

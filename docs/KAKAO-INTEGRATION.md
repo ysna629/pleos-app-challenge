@@ -22,11 +22,11 @@ Option 2 is our proposed architecture, not a Kakao-provided device authorization
 
 ## Kakao Login is not KakaoMap favorites sync
 
-Signing into 도착노트 with a Kakao account identifies a 도착노트 user. It does not sign an embedded map SDK into the KakaoMap consumer application or grant access to that application's saved places. Kakao staff confirmed on 2026-10-06 that there is no API/alternative integration for importing KakaoMap favorite groups; a shared group URL may only lead users to KakaoMap.
+Signing into Route94 with a Kakao account identifies a Route94 user. It does not sign an embedded map SDK into the KakaoMap consumer application or grant access to that application's saved places. Kakao staff confirmed on 2026-10-06 that there is no API/alternative integration for importing KakaoMap favorite groups; a shared group URL may only lead users to KakaoMap.
 
 Staff response: https://devtalk.kakao.com/t/url/151956
 
-The mockup therefore keeps journey favorites inside 도착노트. Cross-device syncing of our own favorites can be added behind our own user accounts, independently of KakaoMap's favorites. Account sign-in is optional for the local map/search functionality.
+The mockup therefore keeps journey favorites inside Route94. Cross-device syncing of our own favorites can be added behind our own user accounts, independently of KakaoMap's favorites. Account sign-in is optional for the local map/search functionality.
 
 ## Build and prototype boundaries
 

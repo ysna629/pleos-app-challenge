@@ -26,7 +26,7 @@ data class Trip(
 
     /** Plain text a phone camera shows after scanning the QR code. */
     fun shareText(): String = buildString {
-        appendLine("[도착노트] ${formatDate(endedAt)}")
+        appendLine("[Route94] ${formatDate(endedAt)}")
         appendLine("운행: ${km(startKm)} → ${km(endKm)} (${km(distanceKm)}, ${purpose.label})")
         if (endAddress.isNotBlank()) appendLine("도착지: $endAddress")
         append("주차 위치: ${parking.ifBlank { "기록 안 함" }}")
@@ -48,7 +48,7 @@ data class Trip(
         val time = SimpleDateFormat("M/d HH:mm", Locale.KOREA).format(Date(endedAt))
         val distance = String.format(Locale.KOREA, "%.1fkm", distanceKm)
         val link = mapLink(map)?.let { "\n$it" } ?: ""
-        return "[도착노트] $spot$place\n$time · $distance ${purpose.short}$link"
+        return "[Route94] $spot$place\n$time · $distance ${purpose.short}$link"
     }
 
     /**
@@ -99,7 +99,7 @@ data class ParkingNote(
         val place = address.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
         val time = SimpleDateFormat("M/d HH:mm", Locale.KOREA).format(Date(savedAt))
         val link = mapLink(map)?.let { "\n$it" } ?: ""
-        return "[도착노트] $spot$place\n$time 주차$link"
+        return "[Route94] $spot$place\n$time 주차$link"
     }
 
     fun smsQrText(phone: String, map: MapApp = MapApp.GOOGLE): String = "SMSTO:${phone.filter(Char::isDigit)}:${smsBody(map)}"

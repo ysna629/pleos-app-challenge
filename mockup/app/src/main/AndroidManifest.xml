@@ -32,7 +32,7 @@
     </queries>
 
     <application
-        android:label="도착노트"
+        android:label="Route94"
         android:theme="@android:style/Theme.Material.NoActionBar">
         <activity
             android:name=".MainActivity"

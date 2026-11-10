@@ -63,7 +63,7 @@ object Notices {
         createChannels(context)
         return Notification.Builder(context, RECORDING_CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setContentTitle("도착노트")
+            .setContentTitle("Route94")
             .setContentText("운행을 기록하고 있어요.")
             .setContentIntent(open(context, null, 0))
             .setOngoing(true)
