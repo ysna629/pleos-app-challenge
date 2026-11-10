@@ -1089,13 +1089,34 @@ class MainActivity : ComponentActivity() {
                 // Everything the phone pages fill in from the car, in one place; every field may stay blank.
                 Text("기본 정보", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
                 Spacer(Modifier.height(12.dp))
-                PhoneField()
+                // Typed into a draft and written only on 저장, so the driver sees the save happen.
+                var draftPhone by remember { mutableStateOf(phone) }
+                var draftProfile by remember { mutableStateOf(profile) }
+                var saved by remember { mutableStateOf(false) }
+                val dirty = draftPhone != phone || draftProfile != profile
+                LaunchedEffect(saved) { if (saved) { kotlinx.coroutines.delay(2_500); saved = false } }
+                val focus = LocalFocusManager.current
+                val keyboard = LocalSoftwareKeyboardController.current
+                PhoneField(draftPhone) { draftPhone = it; saved = false }
                 Spacer(Modifier.height(12.dp))
                 LogbookProfile.LABELS.chunked(2).forEach { pair ->
                     Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        pair.forEach { (key, label) -> ProfileField(key, label, Modifier.weight(1f)) }
+                        pair.forEach { (key, label) -> ProfileField(key, label, draftProfile.get(key), Modifier.weight(1f)) { draftProfile = draftProfile.with(key, it); saved = false } }
                     }
                 }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    PrimaryButton("저장", enabled = dirty && parked == true) {
+                        phone = draftPhone; store.phone = phone
+                        profile = draftProfile; store.profile = profile
+                        saved = true
+                        focus.clearFocus(); keyboard?.hide()
+                    }
+                    when {
+                        saved -> Note("저장했어요.", color = Ui.Accent)
+                        dirty -> Note("저장을 눌러야 반영돼요.", color = Ui.Warn)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
                 Note("휴대폰 번호는 기록 페이지에서 문자를 보낼 때 받는 사람으로 써요. 나머지는 월간 운행기록부 양식에 사용돼요. 비워 두면 빈칸으로 나와요. 모두 이 차량 안에만 저장돼요.")
             }
             Panel(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
@@ -1129,10 +1150,10 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun ProfileField(key: String, label: String, modifier: Modifier) {
+    private fun ProfileField(key: String, label: String, value: String, modifier: Modifier, onChange: (String) -> Unit) {
         OutlinedTextField(
-            value = profile.get(key),
-            onValueChange = { value -> profile = profile.with(key, value.take(40)); store.profile = profile },
+            value = value,
+            onValueChange = { onChange(it.take(40)) },
             label = { Text(label) },
             enabled = parked == true,
             singleLine = true,
@@ -1306,13 +1327,10 @@ class MainActivity : ComponentActivity() {
     private fun viewerBase(): String = intent.getStringExtra("viewer_url") ?: LogbookLink.BASE_URL
 
     @Composable
-    private fun PhoneField() {
+    private fun PhoneField(value: String, onChange: (String) -> Unit) {
         OutlinedTextField(
-            value = phone,
-            onValueChange = { value ->
-                phone = value.filter { it.isDigit() || it == '-' }.take(13)
-                store.phone = phone
-            },
+            value = value,
+            onValueChange = { text -> onChange(text.filter { it.isDigit() || it == '-' }.take(13)) },
             label = { Text(if (parked == false) "내 휴대폰 번호 (정차 중에만 입력)" else "내 휴대폰 번호") },
             // Typing is for a parked car only (driver distraction guideline).
             enabled = parked == true,
