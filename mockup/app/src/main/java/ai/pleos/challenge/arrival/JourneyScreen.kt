@@ -46,7 +46,7 @@ fun JourneyScreen(
     viewerBase: String, exportMessage: String,
     onSaveCsv: (JourneyExport.Snapshot) -> Unit,
     onOpenExport: () -> Unit, busy: Boolean,
-    stopMapApp: StopMapApp, onStopMapAppChange: (StopMapApp) -> Unit,
+    stopMapApp: StopMapApp,
 ) {
     var sample by remember { mutableStateOf(sampleJourney()) }
     var selectedJourney by remember { mutableStateOf<String?>(null) }
@@ -147,7 +147,7 @@ fun JourneyScreen(
             when {
                 journey == null -> QrPlate(null, "여행 기록 QR", empty = "기록이 생기면 QR이 나타나요.")
                 !canEdit -> QrPlate(null, "여행 기록 QR", empty = if (parked == true) "지금 하던 일을 마치면 QR이 나타나요." else "주차 중일 때만 QR을 보여 줘요.")
-                share == SHARE_MAP -> StopMapShare(stop, stopMapApp, onStopMapAppChange)
+                share == SHARE_MAP -> StopMapShare(stop, stopMapApp)
                 else -> {
                     val snapshot = remember(journey.id, journey.title, journey.stops, preview) { JourneyExport.snapshot(journey, preview) }
                     JourneyQrShare(snapshot, viewerBase, csv = share == SHARE_CSV, message = exportMessage, onSave = onSaveCsv)

@@ -44,8 +44,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -95,7 +93,7 @@ import kotlinx.coroutines.withContext
  */
 class MainActivity : ComponentActivity() {
 
-    private enum class Screen { HOME, LOGBOOK, RECORDS, JOURNEY }
+    private enum class Screen { HOME, LOGBOOK, RECORDS, JOURNEY, SETTINGS }
 
     /** ASK_* speaks a question, HEAR_* listens for the answer, CHOOSE_* waits for a tap after voice failed. */
     private enum class Step {
@@ -929,6 +927,7 @@ class MainActivity : ComponentActivity() {
                             Screen.HOME -> HomeScreen()
                             Screen.LOGBOOK -> LogbookScreen()
                             Screen.RECORDS -> RecordsScreen()
+                            Screen.SETTINGS -> SettingsScreen()
                             Screen.JOURNEY -> JourneyScreen(
                                 journeys = journeys, parked = parked, preview = journeyPreview, onPreviewChange = { journeyPreview = it },
                                 shareRequest = journeyShareRequest, onShareRequestHandled = { journeyShareRequest = null },
@@ -938,13 +937,13 @@ class MainActivity : ComponentActivity() {
                                 viewerBase = intent.getStringExtra("viewer_url") ?: LogbookLink.BASE_URL,
                                 exportMessage = exportMessage, onSaveCsv = ::saveJourneyCsv,
                                 onOpenExport = { exportMessage = "" }, busy = step != Step.IDLE,
-                                stopMapApp = stopMapApp, onStopMapAppChange = { stopMapApp = it; journeyStore.stopMapApp = it },
+                                stopMapApp = stopMapApp,
                             )
                         }
                     }
                     if (confirmWithdraw) WithdrawBanner() else if (showBanner) ArrivalBanner()
                     // The organizing flow asks and listens by itself; everywhere else the mic is in the same place.
-                    if (screen != Screen.LOGBOOK) VoiceBar()
+                    if (screen != Screen.LOGBOOK && screen != Screen.SETTINGS) VoiceBar()
                 }
             }
         }
@@ -1021,20 +1020,56 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Rarely used actions stay out of the tab row; consent withdrawal must still be one tap away from any screen. */
+    /** Rarely used things live on their own screen; consent withdrawal is still two taps from anywhere. */
     @Composable
     private fun SettingsMenu() {
-        var open by remember { mutableStateOf(false) }
-        Box {
-            IconButton(onClick = { open = true }, modifier = Modifier.size(56.dp)) {
-                Icon(Icons.Filled.Settings, contentDescription = "설정", tint = Ui.Muted, modifier = Modifier.size(34.dp))
+        val on = screen == Screen.SETTINGS
+        IconButton(onClick = { screen = Screen.SETTINGS }, modifier = Modifier.size(56.dp)) {
+            Icon(Icons.Filled.Settings, contentDescription = "설정", tint = if (on) Ui.Ink else Ui.Muted, modifier = Modifier.size(34.dp))
+        }
+    }
+
+    @Composable
+    private fun SettingsScreen() {
+        var showConsent by remember { mutableStateOf(false) }
+        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
+            Panel(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+                Heading("설정")
+                Spacer(Modifier.height(24.dp))
+                Text("내 설정", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
+                Spacer(Modifier.height(12.dp))
+                PhoneField()
+                Note("문자 QR의 받는 사람으로만 써요.", modifier = Modifier.padding(top = 6.dp))
+                Spacer(Modifier.height(20.dp))
+                Note("주차 위치 문자의 지도 링크")
+                Spacer(Modifier.height(8.dp))
+                Segmented(MapApp.entries.map { it.label }, MapApp.entries.indexOf(mapApp)) { mapApp = MapApp.entries[it]; store.mapApp = mapApp }
+                Spacer(Modifier.height(20.dp))
+                Note("여행 장소를 여는 지도 앱")
+                Spacer(Modifier.height(8.dp))
+                Segmented(StopMapApp.entries.map { it.label }, StopMapApp.entries.indexOf(stopMapApp)) { stopMapApp = StopMapApp.entries[it]; journeyStore.stopMapApp = stopMapApp }
+                Rule(Modifier.padding(vertical = 28.dp))
+                Text("개인정보", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    QuietButton(if (showConsent) "동의한 내용 닫기" else "동의한 내용 보기") { showConsent = !showConsent }
+                    QuietButton("동의 철회 및 기록 삭제") { confirmWithdraw = true }
+                }
+                if (showConsent) {
+                    Spacer(Modifier.height(16.dp))
+                    Consent.items.forEach { item ->
+                        Text(item.title, fontSize = Ui.Small, fontWeight = FontWeight.Bold, color = Ui.Ink, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
+                        Note(item.detail)
+                    }
+                    Note(Consent.STORAGE, modifier = Modifier.padding(top = 12.dp))
+                }
+                Rule(Modifier.padding(vertical = 28.dp))
+                Text("앱 정보", fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
+                Spacer(Modifier.height(12.dp))
+                Fact("버전", BuildConfig.VERSION_NAME)
+                Fact("보관", "모든 기록은 이 차량 안에만 저장돼요")
             }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                DropdownMenuItem(
-                    text = { Text("개인정보 동의 철회", fontSize = Ui.Body) },
-                    onClick = { open = false; confirmWithdraw = true },
-                )
-            }
+            Spacer(Modifier.width(Ui.ShareWidth))
         }
     }
 
@@ -1168,18 +1203,14 @@ class MainActivity : ComponentActivity() {
     /** An SMS to the driver's own number as a QR, with the text it will send. [qr] and [body] are null with nothing to send. */
     @Composable
     private fun SmsShare(qr: String?, body: String?, hasLink: Boolean, empty: String) {
-        PhoneField()
         val ready = phone.count(Char::isDigit) >= 10
         QrPlate(
             qr.takeIf { ready }, "문자 보내기 QR 코드",
-            empty = if (body == null) empty else "내 번호를 입력하면 QR이 나타나요.",
+            empty = if (body == null) empty else "설정에서 내 휴대폰 번호를 입력하면 QR이 나타나요.",
         )
+        if (body != null && !ready) QuietButton("설정 열기") { screen = Screen.SETTINGS }
         if (body != null) {
-            Note("카메라로 스캔하면 문자 앱이 열려요. 보내면 내 문자함에 남아요.")
-            if (hasLink) Segmented(MapApp.entries.map { it.label }, MapApp.entries.indexOf(mapApp)) {
-                mapApp = MapApp.entries[it]
-                store.mapApp = mapApp
-            }
+            Note(if (hasLink) "카메라로 스캔하면 문자 앱이 열려요. 보내면 내 문자함에 남아요. 지도는 ${mapApp.label} 링크예요." else "카메라로 스캔하면 문자 앱이 열려요. 보내면 내 문자함에 남아요.")
             Text(body, fontSize = Ui.Small, color = Ui.Ink, lineHeight = 28.sp, modifier = Modifier.fillMaxWidth().background(Ui.Raised, Ui.ControlShape).padding(16.dp))
         }
     }

@@ -8,7 +8,7 @@ import android.content.Context
  */
 object Consent {
     /** Bump when the collected items change so everyone is asked again. */
-    const val VERSION = 6
+    const val VERSION = 7
 
     data class Item(val title: String, val detail: String)
 
@@ -20,7 +20,7 @@ object Consent {
     )
 
     const val STORAGE = "운행·여행 기록과 음성에서 변환한 메모는 이 차량 안에 보관해요. 녹음은 저장하지 않아요. 주변 검색 시 선택한 주차 좌표만 카카오에 보내며 전체 이동 경로는 보내지 않아요. 문자는 직접 보내기를 누를 때만 휴대폰에서 발송돼요. 운행기록부·여행 기록 QR은 기록을 링크 안에 담아 휴대폰에서 펼쳐요(웹 서버로 전송되지 않음). 예시 여행은 실제 기록과 별개예요."
-    const val WITHDRAW = "화면 오른쪽 위 ⚙ 메뉴의 '개인정보 동의 철회'를 누르면 바로 수집을 멈추고 저장된 기록을 모두 지워요."
+    const val WITHDRAW = "화면 오른쪽 위 ⚙ 설정의 '동의 철회 및 기록 삭제'를 누르면 바로 수집을 멈추고 저장된 기록을 모두 지워요."
 }
 
 class ConsentStore(context: Context) {
