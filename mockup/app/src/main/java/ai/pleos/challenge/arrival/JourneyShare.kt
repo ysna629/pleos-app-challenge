@@ -53,13 +53,14 @@ fun JourneyQrShare(
 
 /** One stop's map link as a QR: the phone opens the map itself, with no hosted page. */
 @Composable
-fun StopMapShare(stop: JourneyStop?, app: StopMapApp) {
+fun StopMapShare(stop: JourneyStop?, app: StopMapApp, onPick: (StopMapApp) -> Unit) {
     if (stop == null) return QrPlate(null, "지도 열기 QR", empty = "들른 곳을 고르면 지도 QR이 나타나요.")
     Text(stop.name.ifBlank { stop.address.ifBlank { "이 방문의 위치" } }, fontSize = Ui.Body, fontWeight = FontWeight.Bold, color = Ui.Ink)
+    Segmented(StopMapApp.entries.map { it.label }, StopMapApp.entries.indexOf(app)) { onPick(StopMapApp.entries[it]) }
     QrPlate(stop.mapQrLink(app), "지도 열기 QR", empty = "위치와 주소가 없어 지도를 열 수 없어요.")
     Note(
         (if (app == StopMapApp.GOOGLE) "카메라로 스캔하면 구글 지도가 열려요. 앱이 없으면 브라우저에서 열려요."
-        else "카메라로 스캔하면 ${app.label} 앱이 열려요. 앱이 설치되어 있어야 해요.") + " 지도 앱은 설정에서 바꿔요.",
+        else "카메라로 스캔하면 ${app.label} 앱이 열려요. 앱이 설치되어 있어야 해요.") + " 기본 지도 앱은 설정에서 정해요.",
     )
     Note(
         (if (stop.point?.valid == true) "저장된 주차 좌표를 열어요. 실제 입구와 다를 수 있어요." else "GPS 좌표가 없어 기록된 주소로 검색해요.") +

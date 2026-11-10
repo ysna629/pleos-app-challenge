@@ -111,6 +111,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var voice: Voice
 
     private var screen by mutableStateOf(Screen.HOME)
+    /** Where the settings screen was opened from, so tapping the gear again goes back there. */
+    private var beforeSettings = Screen.HOME
     private var parked by mutableStateOf<Boolean?>(null)
     private var odometer by mutableStateOf<Float?>(null)
     private var showBanner by mutableStateOf(false)
@@ -1039,7 +1041,13 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun SettingsMenu() {
         val on = screen == Screen.SETTINGS
-        IconButton(onClick = { leaveFlow(); screen = Screen.SETTINGS }, modifier = Modifier.size(56.dp)) {
+        IconButton(
+            onClick = {
+                if (on) screen = beforeSettings
+                else { leaveFlow(); beforeSettings = if (screen == Screen.LOGBOOK) Screen.HOME else screen; screen = Screen.SETTINGS }
+            },
+            modifier = Modifier.size(56.dp),
+        ) {
             Icon(Icons.Filled.Settings, contentDescription = "설정", tint = if (on) Ui.Ink else Ui.Muted, modifier = Modifier.size(34.dp))
         }
     }
@@ -1168,8 +1176,8 @@ class MainActivity : ComponentActivity() {
             }
             SharePanel(listOf("마지막 주차 위치 문자"), 0, {}) {
                 SmsShare(
-                    qr = last?.smsQrText(phone, mapApp), body = last?.smsBody(mapApp), hasLink = last?.mapLink() != null,
-                    empty = "주차 위치를 기록하면 QR이 나타나요.",
+                    qr = { last?.smsQrText(phone, it) }, body = { last?.smsBody(it) }, hasLink = last?.mapLink() != null,
+                    empty = "주차 위치를 기록하면 QR이 나타나요.", canPick = false,
                 )
             }
         }
@@ -1216,17 +1224,24 @@ class MainActivity : ComponentActivity() {
     }
 
     /** An SMS to the driver's own number as a QR, with the text it will send. [qr] and [body] are null with nothing to send. */
+    /**
+     * [body] builds the SMS for a map app; the default app comes from settings and can be changed here for this
+     * QR only. [canPick] false hides that choice.
+     */
     @Composable
-    private fun SmsShare(qr: String?, body: String?, hasLink: Boolean, empty: String) {
+    private fun SmsShare(qr: (MapApp) -> String?, body: (MapApp) -> String?, hasLink: Boolean, empty: String, canPick: Boolean = true) {
+        var pick by remember(mapApp) { mutableStateOf(mapApp) }
         val ready = phone.count(Char::isDigit) >= 10
+        val text = body(pick)
         QrPlate(
-            qr.takeIf { ready }, "문자 보내기 QR 코드",
-            empty = if (body == null) empty else "설정에서 내 휴대폰 번호를 입력하면 QR이 나타나요.",
+            qr(pick).takeIf { ready }, "문자 보내기 QR 코드",
+            empty = if (text == null) empty else "설정에서 내 휴대폰 번호를 입력하면 QR이 나타나요.",
         )
-        if (body != null && !ready) QuietButton("설정 열기") { screen = Screen.SETTINGS }
-        if (body != null) {
-            Note(if (hasLink) "카메라로 스캔하면 문자 앱이 열려요. 보내면 내 문자함에 남아요. 지도는 ${mapApp.label} 링크예요." else "카메라로 스캔하면 문자 앱이 열려요. 보내면 내 문자함에 남아요.")
-            Text(body, fontSize = Ui.Small, color = Ui.Ink, lineHeight = 28.sp, modifier = Modifier.fillMaxWidth().background(Ui.Raised, Ui.ControlShape).padding(16.dp))
+        if (text != null && !ready) QuietButton("설정 열기") { beforeSettings = screen; screen = Screen.SETTINGS }
+        if (text != null) {
+            Note("카메라로 스캔하면 문자 앱이 열려요. 보내면 내 문자함에 남아요.")
+            if (hasLink && canPick) Segmented(MapApp.entries.map { it.label }, MapApp.entries.indexOf(pick)) { pick = MapApp.entries[it] }
+            Text(text, fontSize = Ui.Small, color = Ui.Ink, lineHeight = 28.sp, modifier = Modifier.fillMaxWidth().background(Ui.Raised, Ui.ControlShape).padding(16.dp))
         }
     }
 
@@ -1415,7 +1430,7 @@ class MainActivity : ComponentActivity() {
                 else {
                     val trip = trips.getOrNull(selected)
                     SmsShare(
-                        qr = trip?.smsQrText(phone, mapApp), body = trip?.smsBody(mapApp), hasLink = trip?.mapLink() != null,
+                        qr = { trip?.smsQrText(phone, it) }, body = { trip?.smsBody(it) }, hasLink = trip?.mapLink() != null,
                         empty = "기록이 생기면 QR이 나타나요.",
                     )
                 }

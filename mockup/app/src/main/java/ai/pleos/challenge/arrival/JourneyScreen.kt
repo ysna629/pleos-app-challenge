@@ -55,6 +55,8 @@ fun JourneyScreen(
     val stop = journey?.stops?.firstOrNull { it.id == selectedStopId } ?: journey?.stops?.lastOrNull()
     val canEdit = parked == true && !busy
     var share by remember { mutableIntStateOf(SHARE_VIEW) }
+    // The map app from settings is the default; the phone column can switch it for one QR.
+    var mapPick by remember(stopMapApp) { mutableStateOf(stopMapApp) }
 
     // "휴대폰으로 보여 줘" and "엑셀로 내보내 줘" pick what the phone column shows.
     LaunchedEffect(shareRequest) {
@@ -147,7 +149,7 @@ fun JourneyScreen(
             when {
                 journey == null -> QrPlate(null, "여행 기록 QR", empty = "기록이 생기면 QR이 나타나요.")
                 !canEdit -> QrPlate(null, "여행 기록 QR", empty = if (parked == true) "지금 하던 일을 마치면 QR이 나타나요." else "주차 중일 때만 QR을 보여 줘요.")
-                share == SHARE_MAP -> StopMapShare(stop, stopMapApp)
+                share == SHARE_MAP -> StopMapShare(stop, mapPick) { mapPick = it }
                 else -> {
                     val snapshot = remember(journey.id, journey.title, journey.stops, preview) { JourneyExport.snapshot(journey, preview) }
                     JourneyQrShare(snapshot, viewerBase, csv = share == SHARE_CSV, message = exportMessage, onSave = onSaveCsv)
