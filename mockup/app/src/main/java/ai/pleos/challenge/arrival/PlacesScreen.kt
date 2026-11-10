@@ -56,7 +56,7 @@ fun PlacesView(
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Ui.Gap)) {
         Panel(Modifier.weight(1f).fillMaxHeight()) {
             switcher()
-            Note(if (places.isEmpty()) "오늘 걸음에서 별표한 곳이 여기에 모여요." else "최근에 남긴 발자국이 위에 있어요.")
+            Note(if (places.isEmpty()) "오늘 발자취에서 별표한 곳이 여기에 모여요." else "최근에 남긴 발자국이 위에 있어요.")
             Spacer(Modifier.height(12.dp))
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(places, key = { it.stop.id }) { item ->
@@ -82,7 +82,7 @@ fun PlacesView(
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                     Heading("아직 남긴 발자국이 없어요")
                     Spacer(Modifier.height(12.dp))
-                    Note("오늘 걸음에서 들른 곳 옆의 별을 누르거나, 달리면서 \"여기 기억해 줘\"라고 말하면 여기에 남아요.")
+                    Note("오늘 발자취에서 들른 곳 옆의 별을 누르거나, 달리면서 \"여기 기억해 줘\"라고 말하면 여기에 남아요.")
                 }
             } else {
                 PlaceDetails(place, canEdit, parked) { change -> onUpdate(place.journeyId, place.stop.id, change) }

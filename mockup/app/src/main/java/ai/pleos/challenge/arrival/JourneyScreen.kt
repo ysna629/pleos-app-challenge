@@ -55,7 +55,7 @@ fun JourneyScreen(
     var view by remember { mutableIntStateOf(VIEW_TODAY) }
     if (preview) view = VIEW_TODAY
     val switcher: @Composable () -> Unit = {
-        Segmented(listOf("오늘 걸음", "발자국${if (places.isEmpty()) "" else " ${places.size}"}"), view, enabled = !preview) { view = it }
+        Segmented(listOf("오늘 발자취", "발자국${if (places.isEmpty()) "" else " ${places.size}"}"), view, enabled = !preview) { view = it }
         Spacer(Modifier.height(16.dp))
     }
     if (view == VIEW_PLACES) {
