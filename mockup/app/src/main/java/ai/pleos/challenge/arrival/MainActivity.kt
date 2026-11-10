@@ -1160,8 +1160,8 @@ class MainActivity : ComponentActivity() {
                         "계기판 ${odometer?.let(::km) ?: "읽는 중"}",
                     ),
                 ) {
-                    if (pending != null) PrimaryButton("기록하기", enabled = step == Step.IDLE && parked == true) { startLogbook() }
-                    else QuietButton("운행일지 보기") { screen = Screen.RECORDS }
+                    if (pending != null) PrimaryButton("기록하기", Modifier.fillMaxWidth(), enabled = step == Step.IDLE && parked == true) { startLogbook() }
+                    else QuietButton("기록 보기", Modifier.fillMaxWidth()) { screen = Screen.RECORDS }
                 }
                 Rule()
                 SummaryRow(
@@ -1171,7 +1171,7 @@ class MainActivity : ComponentActivity() {
                     details = if (last == null) listOf("운행일지와 따로 주차 위치만 남길 수 있어요")
                     else listOfNotNull(formatDate(last.savedAt), last.address.takeIf { it.isNotBlank() }),
                 ) {
-                    QuietButton("기록하기", enabled = step == Step.IDLE && parked == true) { startParkOnly() }
+                    QuietButton("기록하기", Modifier.fillMaxWidth(), enabled = step == Step.IDLE && parked == true) { startParkOnly() }
                 }
                 Rule()
                 val journey = journeys.firstOrNull { it.endedAt == null }
@@ -1184,7 +1184,7 @@ class MainActivity : ComponentActivity() {
                         "다시 갈 곳 ${journey?.stops?.count { it.favorite } ?: 0}곳",
                     ),
                 ) {
-                    QuietButton("여행 보기") { journeyPreview = false; screen = Screen.JOURNEY }
+                    QuietButton("여행 보기", Modifier.fillMaxWidth()) { journeyPreview = false; screen = Screen.JOURNEY }
                 }
             }
             SharePanel(listOf("마지막 주차 위치 문자"), 0, {}) {
@@ -1210,7 +1210,8 @@ class MainActivity : ComponentActivity() {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 details.forEach { Text(it, fontSize = Ui.Body, color = Ui.Muted, maxLines = 2, overflow = TextOverflow.Ellipsis) }
             }
-            Box(Modifier.width(170.dp), contentAlignment = Alignment.CenterEnd) { action() }
+            // Same width on every row so the buttons line up as a column.
+            Box(Modifier.width(180.dp), contentAlignment = Alignment.CenterEnd) { action() }
         }
     }
 
