@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Route94 브랜드 스토리</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<style>
+  @page { size: A4; margin: 0; }
+  :root { --ink:#1e2b3b; --text:#2f3a47; --muted:#6b7684; --accent:#2f6aa8; --soft:#eef3f8; --line:#d6dee8; --badge:#e3edf7; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", sans-serif; color: var(--text); font-size: 10.5pt; line-height: 1.75; word-break: keep-all; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 210mm; height: 297mm; padding: 19mm 19mm 0; position: relative; page-break-after: always; overflow: hidden; }
+  .page:last-child { page-break-after: auto; }
+  .foot { position: absolute; left: 19mm; right: 19mm; bottom: 11mm; display: flex; justify-content: space-between; font-size: 8pt; color: var(--muted); }
+  h2 { font-size: 15pt; color: var(--ink); margin: 0 0 12px; font-weight: 700; letter-spacing: -0.01em; }
+  h2 small { font-size: 9.5pt; color: var(--muted); font-weight: 400; margin-left: 8px; }
+  section { margin-bottom: 30px; }
+  .p2 section { margin-bottom: 22px; }
+  p { margin: 0 0 12px; }
+  b, strong { color: var(--ink); }
+
+  .cover { text-align: center; padding-top: 4mm; padding-bottom: 20px; border-bottom: 1px solid var(--line); margin-bottom: 30px; }
+  .cover .kicker { font-size: 9pt; color: var(--muted); letter-spacing: 0.04em; }
+  .brand { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 14px 0 12px; }
+  .brand .word { font-size: 38pt; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; }
+  .tagline { font-size: 13pt; color: var(--muted); }
+  .tagline b { color: var(--ink); }
+  .cover .date { font-size: 8.5pt; color: var(--muted); margin-top: 8px; }
+
+  .quote { background: var(--soft); border-left: 4px solid var(--accent); padding: 14px 22px; font-weight: 700; color: var(--ink); font-size: 12pt; margin: 0 0 14px; line-height: 1.7; }
+  h3 { font-size: 12pt; color: var(--ink); margin: 0 0 10px; }
+  .closing { font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+  .closing + .sig { color: var(--accent); font-weight: 700; }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px; font-size: 9.5pt; line-height: 1.7; }
+  .card .t { font-size: 15pt; font-weight: 700; color: var(--ink); }
+  .card .s { font-size: 9pt; color: var(--accent); font-weight: 700; margin: 2px 0 8px; }
+
+  .feature { border: 1px solid var(--line); border-radius: 8px; padding: 12px 22px 10px; margin-bottom: 10px; }
+  .feature .head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .feature .no { font-weight: 700; color: var(--ink); font-size: 11pt; }
+  .feature .name { font-weight: 800; color: var(--ink); font-size: 13.5pt; }
+  .feature .sub { font-weight: 700; color: var(--ink); font-size: 11pt; }
+  .feature .badge { margin-left: auto; background: var(--badge); color: var(--accent); font-size: 8.5pt; font-weight: 700; padding: 3px 10px; border-radius: 5px; }
+  .feature .lead { font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+  .feature ul { margin: 0 0 4px; padding-left: 18px; font-size: 9.6pt; line-height: 1.65; }
+  .feature li { margin: 1px 0; }
+  .feature .note { font-size: 9pt; color: var(--muted); }
+
+  .home { background: var(--soft); border-radius: 8px; padding: 10px 20px; font-size: 9.6pt; margin-bottom: 10px; }
+  .home b { color: var(--ink); }
+
+  .boxes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .box { background: var(--soft); border-radius: 8px; padding: 16px 18px; font-size: 9.6pt; }
+  .box h4 { margin: 0 0 6px; font-size: 11pt; color: var(--ink); }
+  .box .sdk { margin-top: 10px; font-size: 8.5pt; color: var(--accent); font-weight: 700; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 9.6pt; }
+  th { text-align: left; font-weight: 400; color: var(--muted); padding: 8px 10px; border-bottom: 1.5px solid var(--line); }
+  td { padding: 12px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr.main td { background: var(--soft); }
+  td.slogan { font-weight: 700; color: var(--ink); white-space: nowrap; }
+  td.use { color: var(--muted); white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="cover">
+    <div class="kicker">개척자들 · Pleos 차량용 앱 개발 공모전</div>
+    <div class="brand">
+      <svg width="64" height="76" viewBox="0 0 64 76" aria-label="Route 94 shield">
+        <path d="M6 4 Q32 -2 58 4 L58 34 Q58 58 32 72 Q6 58 6 34 Z" fill="#fff" stroke="#1e2b3b" stroke-width="3.5"/>
+        <line x1="10" y1="26" x2="54" y2="26" stroke="#1e2b3b" stroke-width="2"/>
+        <text x="32" y="20" text-anchor="middle" font-family="Pretendard Variable, sans-serif" font-size="9" font-weight="800" fill="#1e2b3b">ROUTE</text>
+        <text x="32" y="51" text-anchor="middle" font-family="Pretendard Variable, sans-serif" font-size="22" font-weight="800" fill="#1e2b3b">94</text>
+      </svg>
+      <div class="word">Route94</div>
+    </div>
+    <div class="tagline"><b>Every Drive Tells a Story.</b> — 모든 주행에는 이야기가 있다.</div>
+    <div class="date">브랜드 스토리 · 2026년 11월</div>
+  </div>
+
+  <section>
+    <h2>1. 핵심 콘셉트</h2>
+    <div class="quote">길을 기록하는 것을 넘어, 나만의 길을 개척하다</div>
+    <p>Route94는 주차하는 순간 차가 먼저 묻고, 운전자의 대답 한마디로 <b>운행일지·주차 위치·발자취</b>를 남기는 Pleos 차량용 앱입니다.</p>
+  </section>
+
+  <section>
+    <h2>2. 브랜드 스토리</h2>
+    <h3>Route94 — 모든 주행에는 이야기가 있다.</h3>
+    <p>미국의 전설적인 66번 국도, Route 66. 수많은 여행자가 이 길을 따라 새로운 세상을 만났고, 그 여정은 단순한 이동을 넘어 저마다의 이야기가 되었습니다.</p>
+    <p>우리는 그 길에서 영감을 얻었습니다. 목적지에 얼마나 빨리 도착했는지보다, 그곳에 이르기까지 어떤 길을 지나왔고 무엇을 발견했는지가 더 오래 기억에 남는다고 믿습니다.</p>
+    <p>하지만 운전대를 잡은 손으로는 아무것도 적을 수 없습니다. 계기판 거리를 옮겨 적는 일도, 주차한 기둥 번호를 사진으로 남기는 일도, 창밖으로 스친 가게 이름을 기억해 두는 일도 모두 운전자의 몫이었습니다.</p>
+    <p>Route94는 그 일을 차에게 맡깁니다. 기어를 P에 놓으면 차가 먼저 묻고, 운전자는 대답만 하면 됩니다. 지나온 길은 운행일지로 남고, 주차한 자리는 돌아갈 길을 알려 주며, 들른 곳은 다음 여정의 목적지가 됩니다.</p>
+    <p>1994년생 개띠들이 모인 팀 ‘개척자들’. 우리는 Route 66의 개척 정신을 이어받아, 우리가 태어난 해 94에 우리만의 정체성을 담았습니다. Route 66이 새로운 세상을 향한 길이었다면, Route94는 매일 달리는 길 위에서 새로운 발견을 향한 길입니다.</p>
+    <p class="closing">우리가 지나온 모든 길이, 다음 여정의 시작이 되도록.</p>
+    <p class="sig">Route94 — Every Drive Tells a Story.</p>
+  </section>
+  <div class="foot"><span>Route94 | 개척자들</span><span>1</span></div>
+</div>
+
+<div class="page p2">
+  <section>
+    <h2>3. 이름에 담긴 의미</h2>
+    <div class="cards">
+      <div class="card"><div class="t">Route</div><div class="s">Route 66에서</div>개척과 발견, 미지의 장소를 향한 여행을 상징하는 미국 횡단 도로. 지나온 길을 기록하고, 그 길에서 발견한 곳을 다음 목적지로 잇는다는 뜻입니다.</div>
+      <div class="card"><div class="t">94</div><div class="s">1994년생</div>팀원 모두가 1994년생 개띠라는 공통점이자, 우리만의 길을 만들겠다는 의지입니다.</div>
+      <div class="card"><div class="t">개척자들</div><div class="s">팀 이름</div>개띠라서 지은 이름에서 나아가, 익숙한 일상의 도로에서 새로운 가치를 개척하는 사람들이라는 뜻입니다.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>4. 세 가지 핵심 기능 <small>달려온 길, 멈춘 자리, 길 위에서 만난 곳</small></h2>
+    <div class="home">앱의 첫 화면은 앱 이름을 딴 <b>My Route</b>입니다. 세 기능의 오늘 기록을 한 화면에 모아 보여 주고, 탭은 <b>My Route · My Story · My Discovery</b> 순서입니다.</div>
+
+    <div class="feature">
+      <div class="head"><span class="no">01</span><span class="name">My Story</span><span class="sub">지나온 길을 기록하다</span><span class="badge">앱 · My Story 탭 (운행일지)</span></div>
+      <div class="lead">따로 적지 않아도 오늘 달린 길이 운행 기록으로 남습니다.</div>
+      <ul>
+        <li>기어가 P를 벗어나고 돌아올 때마다 시각, 계기판 거리, 주소를 자동으로 기록합니다.</li>
+        <li>주차 후 “운행을 기록할까요?”에 대답만 하면 저장되고, 출퇴근·일반 업무·비업무로 구분합니다.</li>
+        <li>한 달 치 기록을 QR로 휴대폰에 받아 업무용승용차 운행기록부 양식으로 열고 엑셀로 저장합니다.</li>
+      </ul>
+      <div class="note">업무용 차량을 모는 직장인과 개인사업자의 월말 정산 부담을 덜어 줍니다.</div>
+    </div>
+
+    <div class="feature">
+      <div class="head"><span class="no">02</span><span class="name">My Stop</span><span class="sub">여정의 끝을 기억하다</span><span class="badge">앱 · My Route 화면의 주차 위치</span></div>
+      <div class="lead">차에서 내리기 전 한마디가, 다시 차로 돌아오는 길이 됩니다.</div>
+      <ul>
+        <li>주차하면 “어디에 주차하셨나요?”라고 묻고, “지하 5층 A4”처럼 말한 그대로 저장합니다.</li>
+        <li>돌아갈 때 “주차 어디 했지?”라고 물으면 마지막 주차 위치를 음성으로 알려 줍니다.</li>
+        <li>QR로 휴대폰에서 카카오맵·네이버 지도·구글 지도로 열거나 문자로 보낼 수 있습니다.</li>
+      </ul>
+      <div class="note">GPS가 닿지 않는 지하 주차장에서도 층과 기둥 번호까지 기억합니다.</div>
+    </div>
+
+    <div class="feature">
+      <div class="head"><span class="no">03</span><span class="name">My Discovery</span><span class="sub">스쳐 간 발견을 간직하다</span><span class="badge">앱 · My Discovery 탭 (발자취)</span></div>
+      <div class="lead">나들이에서 들른 곳과 지나며 눈에 띈 곳이 다음 여정의 목적지가 됩니다.</div>
+      <ul>
+        <li>오늘 이동한 경로와 들른 곳, 머문 시간을 자동으로 모읍니다.</li>
+        <li>마음에 든 곳은 “여기 기억해 줘” 한마디로 별표를 남기고, 달리는 중이면 그 순간의 위치를 찜합니다.</li>
+        <li>별표한 곳은 발자국 목록에 계속 남고, 휴대폰에서 방문 목록·엑셀·장소별 지도로 확인합니다.</li>
+      </ul>
+      <div class="note">운행일지와 주차 위치가 운전자의 수고를 덜어 준다면, 발자취는 운전 경험 자체에 새로운 가치를 더합니다.</div>
+    </div>
+  </section>
+  <div class="foot"><span>Route94 | 개척자들</span><span>2</span></div>
+</div>
+
+<div class="page">
+  <section>
+    <h2>5. 차 안이라서 가능한 것</h2>
+    <div class="boxes">
+      <div class="box"><h4>차가 먼저 압니다</h4>기어 상태, 계기판 거리, 내비 주소, GPS 좌표로 도착 순간을 알아챕니다. 운전자가 앱을 열어 둘 필요가 없습니다.<div class="sdk">Vehicle · NaviHelper · FusedLocation</div></div>
+      <div class="box"><h4>손 대신 말로</h4>질문과 대답은 음성으로 주고받습니다. 글자 입력은 정차 중에만 하고, 주행 중에는 큰 버튼 두 개만 보입니다.<div class="sdk">TextToSpeech · SpeechToText</div></div>
+      <div class="box"><h4>차에서 휴대폰으로</h4>차량 화면의 QR 하나로 휴대폰에 옮깁니다. 기록은 차 안과 링크에만 담기고 서버에 저장하지 않습니다.<div class="sdk">QR · 정적 웹 페이지</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>6. 발표 핵심 메시지</h2>
+    <div class="quote">기존의 차량 서비스가 ‘어디로 갈 것인가’에 집중했다면,<br>Route94는 ‘어디를 지나왔고, 무엇을 발견했는가’에 집중합니다.</div>
+    <p>주차하는 순간, 차가 묻고 운전자는 대답만 합니다. 팀명 ‘개척자들’은 개띠라서 지은 이름에서 나아가, 익숙한 일상의 도로에서 새로운 가치를 개척하는 사람들이라는 뜻으로 이어집니다.</p>
+  </section>
+
+  <section>
+    <h2>7. 슬로건</h2>
+    <table>
+      <colgroup><col style="width:13%"><col style="width:29%"><col style="width:22%"><col style="width:36%"></colgroup>
+      <tr><th>용도</th><th>슬로건</th><th>뜻</th><th>쓰임</th></tr>
+      <tr class="main"><td class="use">대표</td><td class="slogan">Every Drive Tells a Story.</td><td>모든 주행에는 이야기가 있다.</td><td>브랜드 스토리와 운행일지 탭(My Story)을 하나로 잇는 메시지</td></tr>
+      <tr><td class="use">기능 소개</td><td class="slogan">Drive. Discover. Remember.</td><td>달리고, 발견하고, 기억하다.</td><td>My Story · My Discovery · My Stop을 한 줄로</td></tr>
+      <tr><td class="use">그 밖의 후보</td><td class="slogan">Your Road. Your Story.</td><td>당신의 길, 당신의 이야기.</td><td>개인화된 주행 경험 강조</td></tr>
+      <tr><td class="use"></td><td class="slogan">Beyond the Destination.</td><td>목적지를 넘어, 여정의 가치로.</td><td>내비게이션과의 차별성 강조</td></tr>
+    </table>
+  </section>
+  <div class="foot"><span>Route94 | 개척자들</span><span>3</span></div>
+</div>
+
+</body>
+</html>
