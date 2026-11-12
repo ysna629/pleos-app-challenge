@@ -118,8 +118,8 @@ adb shell am start --user 10 -n ai.pleos.challenge.arrival/.MainActivity --ez de
 ### 테스트
 
 ```sh
-cd mockup && ./gradlew testDebugUnitTest   # 단위 테스트 73개
-node --test viewer/journey-export.test.mjs   # 웹 페이지 테스트 8개
+cd mockup && ./gradlew testDebugUnitTest   # 단위 테스트 80개
+node --test viewer/record.test.mjs viewer/journey-export.test.mjs   # 웹 페이지 테스트 13개
 ```
 
 ## 필요한 설정
