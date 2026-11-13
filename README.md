@@ -148,9 +148,10 @@ node --test viewer/record.test.mjs viewer/journey-export.test.mjs   # 웹 페이
 | 항목 | 내용 |
 |---|---|
 | 에뮬레이터 | Pleos Connect v2.1.0 (Android 14, API 34, arm64) |
+| 화면 규격 | 2560 × 1440 px, 160 dpi (가로) |
 | 개발 PC | macOS (Apple Silicon), Android Studio, JDK 17 |
 | 빌드 | Gradle 8.10.2, AGP 8.8.2, Kotlin 2.0.0, compileSdk 35, minSdk 28 |
-| 휴대폰 | iPhone 기본 카메라로 문자 QR과 웹 페이지 확인 |
+| 휴대폰 | iPhone·Galaxy 기본 카메라로 차량 화면의 QR을 찍어 기록 페이지 확인 |
 
 실제 차량에서는 아직 확인하지 못했습니다. 특히 내비가 떠 있는 동안의 마이크 입력은 에뮬레이터에서 녹음 파일로만 검증했습니다.
 
