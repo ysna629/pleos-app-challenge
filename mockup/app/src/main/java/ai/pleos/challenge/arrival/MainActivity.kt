@@ -1322,7 +1322,7 @@ class MainActivity : ComponentActivity() {
                     step == Step.HEAR_COMMAND -> Heading(partial.ifBlank { "듣고 있어요" })
                     reply.isNotBlank() -> Heading(reply)
                     screen == Screen.JOURNEY -> Text("\"여기 기억해 줘\"   \"휴대폰으로 보여 줘\"", fontSize = Ui.Body, color = Ui.Muted)
-                    else -> Text("\"운행일지 정리해줘\"   \"주차 위치 기록해줘\"   \"주차 어디 했지?\"", fontSize = Ui.Body, color = Ui.Muted)
+                    else -> Text("\"운행일지 정리해줘\"   \"주차 위치 기록해줘\"", fontSize = Ui.Body, color = Ui.Muted)
                 }
                 if (heard.isNotBlank() && step != Step.HEAR_COMMAND) Note("들은 말: \"$heard\"")
                 if (notice.isNotBlank() && step == Step.HEAR_COMMAND) Note(notice, color = Ui.Warn)
